@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"log"
 	"math/rand"
 	"net/http"
@@ -21,8 +20,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/resultset"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
 	tracing "github.com/ydb-platform/ydb-go-sdk-opentracing"
 )
@@ -86,13 +86,13 @@ func main() {
 		creds,
 		ydb.WithSessionPoolSizeLimit(300),
 		ydb.WithSessionPoolIdleThreshold(time.Second*5),
+		ydb.WithLogger(trace.DetailsAll, ydb.WithMinLevel(ydb.TRACE)),
 		ydb.WithTraceDriver(tracing.Driver(
 			tracing.WithDetails(trace.DetailsAll),
 		)),
 		ydb.WithTraceTable(tracing.Table(
 			tracing.WithDetails(trace.DetailsAll),
 		)),
-		ydb.WithGrpcConnectionTTL(5*time.Second),
 	)
 	if err != nil {
 		panic(err)
@@ -217,7 +217,7 @@ func scanSelect(ctx context.Context, c table.Client, prefix string, limit int64)
 	err = c.Do(
 		ctx,
 		func(ctx context.Context, s table.Session) error {
-			var res resultset.Result
+			var res result.StreamResult
 			count = 0
 			res, err = s.StreamExecuteScanQuery(
 				ctx,

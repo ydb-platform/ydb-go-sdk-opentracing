@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"net/url"
+	"sync/atomic"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -48,10 +49,36 @@ func intermediate(s opentracing.Span, err error, alternatingKeyValues ...interfa
 	s.LogKV(alternatingKeyValues...)
 }
 
+type counter struct {
+	span    opentracing.Span
+	counter int64
+	name    string
+}
+
+func (s *counter) add(delta int64) {
+	atomic.AddInt64(&s.counter, delta)
+	s.span.LogKV(s.name, atomic.LoadInt64(&s.counter))
+}
+
+func startSpanWithCounter(ctx *context.Context, operationName string, counterName string, alternatingKeyValues ...interface{}) (c *counter) {
+	defer func() {
+		c.span.SetTag("ydb.driver.sensor", operationName+"_"+counterName)
+	}()
+	return &counter{
+		span:    startSpan(ctx, operationName, alternatingKeyValues...),
+		counter: 0,
+		name:    counterName,
+	}
+}
+
 func startSpan(ctx *context.Context, operationName string, alternatingKeyValues ...interface{}) (s opentracing.Span) {
-	var childCtx context.Context
-	s, childCtx = opentracing.StartSpanFromContext(*ctx, operationName)
-	*ctx = childCtx
+	if ctx != nil {
+		var childCtx context.Context
+		s, childCtx = opentracing.StartSpanFromContext(*ctx, operationName)
+		*ctx = childCtx
+	} else {
+		s = opentracing.StartSpan(operationName)
+	}
 	s.SetTag("scope", "ydb")
 	s.SetTag("version", ydb.Version)
 	s.LogKV(alternatingKeyValues...)

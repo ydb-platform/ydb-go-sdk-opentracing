@@ -221,5 +221,37 @@ func Driver(opts ...option) trace.Driver {
 			}
 		}
 	}
-	return t
+	connectionsTotal := startSpanWithCounter(nil, "ydb_connections", "total")
+	return t.Compose(trace.Driver{
+		OnInit: func(info trace.InitStartInfo) func(trace.InitDoneInfo) {
+			start := startSpan(
+				info.Context,
+				"ydb_driver_init",
+			)
+			return func(info trace.InitDoneInfo) {
+				finish(start, info.Error)
+			}
+		},
+		OnClose: func(info trace.CloseStartInfo) func(trace.CloseDoneInfo) {
+			connectionsTotal.span.Finish()
+			start := startSpan(
+				info.Context,
+				"ydb_driver_close",
+			)
+			return func(info trace.CloseDoneInfo) {
+				finish(start, info.Error)
+			}
+		},
+		OnNetDial: func(info trace.NetDialStartInfo) func(trace.NetDialDoneInfo) {
+			return func(info trace.NetDialDoneInfo) {
+				if info.Error == nil {
+					connectionsTotal.add(1)
+				}
+			}
+		},
+		OnNetClose: func(info trace.NetCloseStartInfo) func(trace.NetCloseDoneInfo) {
+			connectionsTotal.add(-1)
+			return nil
+		},
+	})
 }
