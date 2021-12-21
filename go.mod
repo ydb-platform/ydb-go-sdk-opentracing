@@ -4,5 +4,5 @@ go 1.16
 
 require (
 	github.com/opentracing/opentracing-go v1.2.0
-	github.com/ydb-platform/ydb-go-sdk/v3 v3.5.0-rc0
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.5.0
 )
