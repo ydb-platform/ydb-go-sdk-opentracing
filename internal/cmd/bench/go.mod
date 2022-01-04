@@ -14,7 +14,7 @@ require (
 	github.com/golang/protobuf v1.5.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/stretchr/testify v1.7.0 // indirect
-	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
+	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
 	github.com/ydb-platform/ydb-go-genproto v0.0.0-20211103074319-526e57659e16 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/net v0.0.0-20190620200207-3b0461eec859 // indirect
