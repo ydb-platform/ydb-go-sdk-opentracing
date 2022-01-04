@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/uber/jaeger-client-go v2.29.1+incompatible
-	github.com/ydb-platform/ydb-go-sdk-opentracing v0.0.0-20211123123740-e2a55f5a2902
+	github.com/ydb-platform/ydb-go-sdk-opentracing v0.0.4
 	github.com/ydb-platform/ydb-go-sdk/v3 v3.6.0
 )
 
