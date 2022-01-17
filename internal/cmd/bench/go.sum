@@ -67,6 +67,8 @@ github.com/ydb-platform/ydb-go-genproto v0.0.0-20211103074319-526e57659e16 h1:qX
 github.com/ydb-platform/ydb-go-genproto v0.0.0-20211103074319-526e57659e16/go.mod h1:cc138nptTn9eKptCQl/grxP6pBKpo/bnXDiOxuVZtps=
 github.com/ydb-platform/ydb-go-sdk/v3 v3.6.0 h1:y+fv8Xq5egEE2lB8Ubj3NaRHFCr4m/s5dCpQhs0uVQU=
 github.com/ydb-platform/ydb-go-sdk/v3 v3.6.0/go.mod h1:NnsM1NmIW2gKKqJTBMyVLPzaPOvjF0YdvZFdoyyfRMY=
+github.com/ydb-platform/ydb-go-sdk/v3 v3.7.0 h1:IvVDkNZUl87JbSpm4MwNYpet62j0DDDwHG7T+mc8Ruc=
+github.com/ydb-platform/ydb-go-sdk/v3 v3.7.0/go.mod h1:NnsM1NmIW2gKKqJTBMyVLPzaPOvjF0YdvZFdoyyfRMY=
 go.uber.org/atomic v1.9.0 h1:ECmE8Bn/WFTYwEW/bpKD3M8VtR/zQVbavAoalC1PYyE=
 go.uber.org/atomic v1.9.0/go.mod h1:fEN4uk6kAWBTFdckzkM89CLk9XfWZrxpCo0nPH17wJc=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
