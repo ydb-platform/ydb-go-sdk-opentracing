@@ -200,7 +200,7 @@ func Driver(opts ...option) trace.Driver {
 			return func(info trace.PessimizeNodeDoneInfo) {
 				finish(
 					start,
-					info.Error,
+					nil,
 					"state", info.State.String(),
 				)
 			}

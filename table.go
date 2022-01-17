@@ -122,9 +122,6 @@ func Table(opts ...option) trace.Table {
 					)
 					start.SetTag("nodeID", nodeID(info.Session.ID()))
 					return func(info trace.SessionQueryStreamExecuteDoneInfo) {
-						if info.Result != nil && info.Result.Err() != nil {
-							start.LogKV("resultErr", info.Result.Err().Error())
-						}
 						finish(start, info.Error)
 					}
 				}
@@ -136,9 +133,6 @@ func Table(opts ...option) trace.Table {
 					)
 					start.SetTag("nodeID", nodeID(info.Session.ID()))
 					return func(info trace.SessionQueryStreamReadDoneInfo) {
-						if info.Result != nil {
-							start.LogKV("resultErr", info.Result.Err().Error())
-						}
 						finish(start, info.Error)
 					}
 				}
