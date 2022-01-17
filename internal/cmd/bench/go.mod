@@ -6,7 +6,7 @@ require (
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/uber/jaeger-client-go v2.29.1+incompatible
 	github.com/ydb-platform/ydb-go-sdk-opentracing v0.0.5
-	github.com/ydb-platform/ydb-go-sdk/v3 v3.7.0
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.7.1
 )
 
 require (
