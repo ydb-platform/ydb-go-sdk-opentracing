@@ -3,6 +3,7 @@ module github.com/ydb-platform/ydb-go-sdk-opentracing/internal/cmd/bench
 go 1.17
 
 require (
+	github.com/opentracing/opentracing-go v1.2.0
 	github.com/uber/jaeger-client-go v2.29.1+incompatible
 	github.com/ydb-platform/ydb-go-sdk-opentracing v0.0.7
 	github.com/ydb-platform/ydb-go-sdk/v3 v3.7.1
@@ -11,7 +12,6 @@ require (
 require (
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
 	github.com/golang/protobuf v1.5.0 // indirect
-	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/stretchr/testify v1.7.0 // indirect
 	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
