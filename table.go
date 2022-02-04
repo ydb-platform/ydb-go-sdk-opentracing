@@ -15,15 +15,31 @@ func Table(opts ...option) trace.Table {
 	}
 	t := trace.Table{}
 	if h.details&trace.TablePoolRetryEvents != 0 {
-		t.OnPoolRetry = func(info trace.PoolRetryStartInfo) func(info trace.PoolRetryInternalInfo) func(trace.PoolRetryDoneInfo) {
+		t.OnPoolDo = func(info trace.PoolDoStartInfo) func(info trace.PoolDoInternalInfo) func(trace.PoolDoDoneInfo) {
 			start := startSpan(
 				info.Context,
-				"ydb_table_retry",
+				"ydb_table_do",
 			)
 			start.SetTag("idempotent", info.Idempotent)
-			return func(info trace.PoolRetryInternalInfo) func(trace.PoolRetryDoneInfo) {
+			return func(info trace.PoolDoInternalInfo) func(trace.PoolDoDoneInfo) {
 				intermediate(start, info.Error)
-				return func(info trace.PoolRetryDoneInfo) {
+				return func(info trace.PoolDoDoneInfo) {
+					finish(start,
+						info.Error,
+						"attempts", info.Attempts,
+					)
+				}
+			}
+		}
+		t.OnPoolDoTx = func(info trace.PoolDoTxStartInfo) func(info trace.PoolDoTxInternalInfo) func(trace.PoolDoTxDoneInfo) {
+			start := startSpan(
+				info.Context,
+				"ydb_table_do_tx",
+			)
+			start.SetTag("idempotent", info.Idempotent)
+			return func(info trace.PoolDoTxInternalInfo) func(trace.PoolDoTxDoneInfo) {
+				intermediate(start, info.Error)
+				return func(info trace.PoolDoTxDoneInfo) {
 					finish(start,
 						info.Error,
 						"attempts", info.Attempts,
