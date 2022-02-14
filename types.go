@@ -10,20 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/opentracing/opentracing-go"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
-
-type option func(holder *options)
-
-func WithDetails(details trace.Details) option {
-	return func(c *options) {
-		c.details |= details
-	}
-}
-
-type options struct {
-	details trace.Details
-}
 
 func logError(s opentracing.Span, err error) {
 	s.SetTag(string(ext.Error), true)

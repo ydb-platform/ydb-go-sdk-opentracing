@@ -84,12 +84,7 @@ func main() {
 		ydb.WithSessionPoolSizeLimit(300),
 		ydb.WithSessionPoolIdleThreshold(time.Second*5),
 		ydb.WithLogger(trace.DetailsAll, ydb.WithMinLevel(ydb.TRACE)),
-		ydb.WithTraceDriver(tracing.Driver(
-			tracing.WithDetails(trace.DetailsAll),
-		)),
-		ydb.WithTraceTable(tracing.Table(
-			tracing.WithDetails(trace.DetailsAll),
-		)),
+		tracing.WithTraces(trace.DetailsAll),
 	)
 	if err != nil {
 		panic(err)
