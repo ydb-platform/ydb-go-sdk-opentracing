@@ -5,23 +5,15 @@ import (
 )
 
 // Table makes table.ClientTrace with solomon metrics publishing
-func Table(opts ...option) trace.Table {
-	h := &options{}
-	for _, o := range opts {
-		o(h)
-	}
-	if h.details == 0 {
-		h.details = trace.DetailsAll
-	}
-	t := trace.Table{}
-	if h.details&trace.TablePoolRetryEvents != 0 {
-		t.OnPoolDo = func(info trace.PoolDoStartInfo) func(info trace.PoolDoInternalInfo) func(trace.PoolDoDoneInfo) {
+func Table(details trace.Details) (t trace.Table) {
+	if details&trace.TablePoolRetryEvents != 0 {
+		t.OnPoolDo = func(info trace.PoolDoStartInfo) func(info trace.PoolDoIntermediateInfo) func(trace.PoolDoDoneInfo) {
 			start := startSpan(
 				info.Context,
 				"ydb_table_do",
 			)
 			start.SetTag("idempotent", info.Idempotent)
-			return func(info trace.PoolDoInternalInfo) func(trace.PoolDoDoneInfo) {
+			return func(info trace.PoolDoIntermediateInfo) func(trace.PoolDoDoneInfo) {
 				intermediate(start, info.Error)
 				return func(info trace.PoolDoDoneInfo) {
 					finish(start,
@@ -31,13 +23,13 @@ func Table(opts ...option) trace.Table {
 				}
 			}
 		}
-		t.OnPoolDoTx = func(info trace.PoolDoTxStartInfo) func(info trace.PoolDoTxInternalInfo) func(trace.PoolDoTxDoneInfo) {
+		t.OnPoolDoTx = func(info trace.PoolDoTxStartInfo) func(info trace.PoolDoTxIntermediateInfo) func(trace.PoolDoTxDoneInfo) {
 			start := startSpan(
 				info.Context,
 				"ydb_table_do_tx",
 			)
 			start.SetTag("idempotent", info.Idempotent)
-			return func(info trace.PoolDoTxInternalInfo) func(trace.PoolDoTxDoneInfo) {
+			return func(info trace.PoolDoTxIntermediateInfo) func(trace.PoolDoTxDoneInfo) {
 				intermediate(start, info.Error)
 				return func(info trace.PoolDoTxDoneInfo) {
 					finish(start,
@@ -48,8 +40,8 @@ func Table(opts ...option) trace.Table {
 			}
 		}
 	}
-	if h.details&trace.TableSessionEvents != 0 {
-		if h.details&trace.TableSessionLifeCycleEvents != 0 {
+	if details&trace.TableSessionEvents != 0 {
+		if details&trace.TableSessionLifeCycleEvents != 0 {
 			t.OnSessionNew = func(info trace.SessionNewStartInfo) func(trace.SessionNewDoneInfo) {
 				start := startSpan(
 					info.Context,
@@ -89,9 +81,13 @@ func Table(opts ...option) trace.Table {
 				}
 			}
 		}
-		if h.details&trace.TableSessionQueryEvents != 0 {
-			if h.details&trace.TableSessionQueryInvokeEvents != 0 {
-				t.OnSessionQueryPrepare = func(info trace.SessionQueryPrepareStartInfo) func(trace.PrepareDataQueryDoneInfo) {
+		if details&trace.TableSessionQueryEvents != 0 {
+			if details&trace.TableSessionQueryInvokeEvents != 0 {
+				t.OnSessionQueryPrepare = func(
+					info trace.PrepareDataQueryStartInfo,
+				) func(
+					trace.PrepareDataQueryDoneInfo,
+				) {
 					start := startSpan(
 						info.Context,
 						"ydb_table_session_query_prepare",
@@ -107,7 +103,11 @@ func Table(opts ...option) trace.Table {
 						)
 					}
 				}
-				t.OnSessionQueryExecute = func(info trace.ExecuteDataQueryStartInfo) func(trace.SessionQueryPrepareDoneInfo) {
+				t.OnSessionQueryExecute = func(
+					info trace.ExecuteDataQueryStartInfo,
+				) func(
+					trace.ExecuteDataQueryDoneInfo,
+				) {
 					start := startSpan(
 						info.Context,
 						"ydb_table_session_query_execute",
@@ -116,7 +116,7 @@ func Table(opts ...option) trace.Table {
 						"params", info.Parameters.String(),
 					)
 					start.SetTag("nodeID", nodeID(info.Session.ID()))
-					return func(info trace.SessionQueryPrepareDoneInfo) {
+					return func(info trace.ExecuteDataQueryDoneInfo) {
 						finish(
 							start,
 							info.Error,
@@ -127,8 +127,14 @@ func Table(opts ...option) trace.Table {
 					}
 				}
 			}
-			if h.details&trace.TableSessionQueryStreamEvents != 0 {
-				t.OnSessionQueryStreamExecute = func(info trace.SessionQueryStreamExecuteStartInfo) func(trace.SessionQueryStreamExecuteDoneInfo) {
+			if details&trace.TableSessionQueryStreamEvents != 0 {
+				t.OnSessionQueryStreamExecute = func(
+					info trace.SessionQueryStreamExecuteStartInfo,
+				) func(
+					intermediateInfo trace.SessionQueryStreamExecuteIntermediateInfo,
+				) func(
+					trace.SessionQueryStreamExecuteDoneInfo,
+				) {
 					start := startSpan(
 						info.Context,
 						"ydb_table_session_query_stream_execute",
@@ -137,24 +143,44 @@ func Table(opts ...option) trace.Table {
 						"params", info.Parameters.String(),
 					)
 					start.SetTag("nodeID", nodeID(info.Session.ID()))
-					return func(info trace.SessionQueryStreamExecuteDoneInfo) {
-						finish(start, info.Error)
+					return func(
+						info trace.SessionQueryStreamExecuteIntermediateInfo,
+					) func(
+						trace.SessionQueryStreamExecuteDoneInfo,
+					) {
+						intermediate(start, info.Error)
+						return func(info trace.SessionQueryStreamExecuteDoneInfo) {
+							finish(start, info.Error)
+						}
 					}
 				}
-				t.OnSessionQueryStreamRead = func(info trace.SessionQueryStreamReadStartInfo) func(trace.SessionQueryStreamReadDoneInfo) {
+				t.OnSessionQueryStreamRead = func(
+					info trace.SessionQueryStreamReadStartInfo,
+				) func(
+					trace.SessionQueryStreamReadIntermediateInfo,
+				) func(
+					trace.SessionQueryStreamReadDoneInfo,
+				) {
 					start := startSpan(
 						info.Context,
 						"ydb_table_session_query_stream_read",
 						"id", info.Session.ID(),
 					)
 					start.SetTag("nodeID", nodeID(info.Session.ID()))
-					return func(info trace.SessionQueryStreamReadDoneInfo) {
-						finish(start, info.Error)
+					return func(
+						info trace.SessionQueryStreamReadIntermediateInfo,
+					) func(
+						trace.SessionQueryStreamReadDoneInfo,
+					) {
+						intermediate(start, info.Error)
+						return func(info trace.SessionQueryStreamReadDoneInfo) {
+							finish(start, info.Error)
+						}
 					}
 				}
 			}
 		}
-		if h.details&trace.TableSessionTransactionEvents != 0 {
+		if details&trace.TableSessionTransactionEvents != 0 {
 			t.OnSessionTransactionBegin = func(info trace.SessionTransactionBeginStartInfo) func(trace.SessionTransactionBeginDoneInfo) {
 				start := startSpan(
 					info.Context,
@@ -195,8 +221,8 @@ func Table(opts ...option) trace.Table {
 			}
 		}
 	}
-	if h.details&trace.TablePoolEvents != 0 {
-		if h.details&trace.TablePoolLifeCycleEvents != 0 {
+	if details&trace.TablePoolEvents != 0 {
+		if details&trace.TablePoolLifeCycleEvents != 0 {
 			t.OnPoolInit = func(info trace.PoolInitStartInfo) func(trace.PoolInitDoneInfo) {
 				start := startSpan(
 					info.Context,
@@ -221,7 +247,7 @@ func Table(opts ...option) trace.Table {
 				}
 			}
 		}
-		if h.details&trace.TablePoolSessionLifeCycleEvents != 0 {
+		if details&trace.TablePoolSessionLifeCycleEvents != 0 {
 			t.OnPoolSessionNew = func(info trace.PoolSessionNewStartInfo) func(trace.PoolSessionNewDoneInfo) {
 				start := startSpan(
 					info.Context,
@@ -250,7 +276,7 @@ func Table(opts ...option) trace.Table {
 				}
 			}
 		}
-		if h.details&trace.TablePoolAPIEvents != 0 {
+		if details&trace.TablePoolAPIEvents != 0 {
 			t.OnPoolPut = func(info trace.PoolPutStartInfo) func(trace.PoolPutDoneInfo) {
 				start := startSpan(
 					info.Context,

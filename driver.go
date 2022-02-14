@@ -5,16 +5,8 @@ import (
 )
 
 // Driver makes Driver with publishing traces
-func Driver(opts ...option) trace.Driver {
-	h := &options{}
-	for _, o := range opts {
-		o(h)
-	}
-	if h.details == 0 {
-		h.details = trace.DetailsAll
-	}
-	t := trace.Driver{}
-	if h.details&trace.DriverNetEvents != 0 {
+func Driver(details trace.Details) (t trace.Driver) {
+	if details&trace.DriverNetEvents != 0 {
 		t.OnNetDial = func(info trace.NetDialStartInfo) func(trace.NetDialDoneInfo) {
 			start := startSpan(
 				info.Context,
@@ -26,7 +18,7 @@ func Driver(opts ...option) trace.Driver {
 			}
 		}
 	}
-	if h.details&trace.DriverCoreEvents != 0 {
+	if details&trace.DriverCoreEvents != 0 {
 		t.OnConnTake = func(info trace.ConnTakeStartInfo) func(trace.ConnTakeDoneInfo) {
 			start := startSpan(
 				info.Context,
@@ -110,23 +102,7 @@ func Driver(opts ...option) trace.Driver {
 			}
 		}
 	}
-	if h.details&trace.DriverDiscoveryEvents != 0 {
-		t.OnDiscovery = func(info trace.DiscoveryStartInfo) func(trace.DiscoveryDoneInfo) {
-			start := startSpan(
-				info.Context,
-				"ydb_discovery",
-			)
-			start.SetTag("address", info.Address)
-			return func(info trace.DiscoveryDoneInfo) {
-				finish(
-					start,
-					info.Error,
-					"endpoints", info.Endpoints,
-				)
-			}
-		}
-	}
-	if h.details&trace.DriverClusterEvents != 0 {
+	if details&trace.DriverClusterEvents != 0 {
 		t.OnClusterGet = func(info trace.ClusterGetStartInfo) func(trace.ClusterGetDoneInfo) {
 			start := startSpan(
 				info.Context,
@@ -206,7 +182,7 @@ func Driver(opts ...option) trace.Driver {
 			}
 		}
 	}
-	if h.details&trace.DriverCredentialsEvents != 0 {
+	if details&trace.DriverCredentialsEvents != 0 {
 		t.OnGetCredentials = func(info trace.GetCredentialsStartInfo) func(trace.GetCredentialsDoneInfo) {
 			start := startSpan(
 				info.Context,
