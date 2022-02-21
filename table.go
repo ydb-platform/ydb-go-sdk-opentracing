@@ -324,19 +324,6 @@ func Table(details trace.Details) (t trace.Table) {
 					finish(start, info.Error)
 				}
 			}
-			t.OnPoolTake = func(info trace.PoolTakeStartInfo) func(doneInfo trace.PoolTakeWaitInfo) func(doneInfo trace.PoolTakeDoneInfo) {
-				start := startSpan(
-					info.Context,
-					"ydb_table_pool_take",
-					"id", info.Session.ID(),
-				)
-				start.SetTag("nodeID", nodeID(info.Session.ID()))
-				return func(info trace.PoolTakeWaitInfo) func(info trace.PoolTakeDoneInfo) {
-					return func(info trace.PoolTakeDoneInfo) {
-						finish(start, nil)
-					}
-				}
-			}
 		}
 	}
 	return t

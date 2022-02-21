@@ -81,8 +81,8 @@ github.com/uber/jaeger-lib v2.4.1+incompatible h1:td4jdvLcExb4cBISKIpHuGoVXh+dVK
 github.com/uber/jaeger-lib v2.4.1+incompatible/go.mod h1:ComeNDZlWwrWnDv8aPp0Ba6+uUTzImX/AauajbLI56U=
 github.com/ydb-platform/ydb-go-genproto v0.0.0-20220203104745-929cf9c248bc h1:xvTP0fhYNm+Ws+xC34jzF9EdorPUKkucJr0TyybqVSk=
 github.com/ydb-platform/ydb-go-genproto v0.0.0-20220203104745-929cf9c248bc/go.mod h1:cc138nptTn9eKptCQl/grxP6pBKpo/bnXDiOxuVZtps=
-github.com/ydb-platform/ydb-go-sdk/v3 v3.10.0 h1:UkRsVDGvv2ZbCrUPDfiX24FcVaUp5EKHWTriu1dm0ds=
-github.com/ydb-platform/ydb-go-sdk/v3 v3.10.0/go.mod h1:/KCidORSzHOsn+j46Iqb8Tf6UXNhPWRMcrMieh+i9Xw=
+github.com/ydb-platform/ydb-go-sdk/v3 v3.11.0-rc4 h1:QwZD17uoa05h+uaLT56hwxSX/4xoANfRnK7XQGT0WH0=
+github.com/ydb-platform/ydb-go-sdk/v3 v3.11.0-rc4/go.mod h1:/KCidORSzHOsn+j46Iqb8Tf6UXNhPWRMcrMieh+i9Xw=
 go.opentelemetry.io/proto/otlp v0.7.0/go.mod h1:PqfVotwruBrMGOCsRd/89rSnXhoiJIqeYNgFYFoEGnI=
 go.uber.org/atomic v1.9.0 h1:ECmE8Bn/WFTYwEW/bpKD3M8VtR/zQVbavAoalC1PYyE=
 go.uber.org/atomic v1.9.0/go.mod h1:fEN4uk6kAWBTFdckzkM89CLk9XfWZrxpCo0nPH17wJc=
