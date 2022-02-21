@@ -103,6 +103,24 @@ func Driver(details trace.Details) (t trace.Driver) {
 		}
 	}
 	if details&trace.DriverClusterEvents != 0 {
+		t.OnClusterInit = func(info trace.ClusterInitStartInfo) func(trace.ClusterInitDoneInfo) {
+			start := startSpan(
+				info.Context,
+				"ydb_cluster_init",
+			)
+			return func(info trace.ClusterInitDoneInfo) {
+				finish(start, nil)
+			}
+		}
+		t.OnClusterClose = func(info trace.ClusterCloseStartInfo) func(trace.ClusterCloseDoneInfo) {
+			start := startSpan(
+				info.Context,
+				"ydb_cluster_close",
+			)
+			return func(info trace.ClusterCloseDoneInfo) {
+				finish(start, info.Error)
+			}
+		}
 		t.OnClusterGet = func(info trace.ClusterGetStartInfo) func(trace.ClusterGetDoneInfo) {
 			start := startSpan(
 				info.Context,
