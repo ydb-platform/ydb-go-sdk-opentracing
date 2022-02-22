@@ -210,7 +210,6 @@ func Driver(details trace.Details) (t trace.Driver) {
 				finish(
 					start,
 					info.Error,
-					"tokenOk", info.TokenOk,
 				)
 			}
 		}

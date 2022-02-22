@@ -8,6 +8,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
-	github.com/ydb-platform/ydb-go-sdk/v3 v3.11.1
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.11.6
 	go.uber.org/atomic v1.9.0 // indirect
 )
