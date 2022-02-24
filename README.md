@@ -7,7 +7,7 @@ tracing package helps to create ydb-go-sdk opentracing traces
 import (
     "github.com/ydb-platform/ydb-go-sdk/v3"
     "github.com/ydb-platform/ydb-go-sdk/v3/trace"
-    tracing "github.com/ydb-platform/ydb-go-sdk-opentracing"
+    ydbOpentracing "github.com/ydb-platform/ydb-go-sdk-opentracing"
     jaegerConfig "github.com/uber/jaeger-client-go/config"
 )
 
@@ -32,12 +32,9 @@ import (
     db, err := ydb.New(
         ctx,
         ydb.MustConnectionString(connection),
-        ydb.WithTraceDriver(tracing.Driver(
-            tracing.WithDetails(trace.DetailsAll),
-        )),
-        ydb.WithTraceTable(tracing.Table(
-            tracing.WithDetails(trace.DetailsAll),
-        )),
+        ydbOpentracing.WithTraces(
+            ydbOpentracing.WithDetails(trace.DetailsAll),
+        ),
     )
 
 ```
