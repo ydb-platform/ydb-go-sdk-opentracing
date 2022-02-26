@@ -30,38 +30,6 @@ func Driver(details trace.Details) (t trace.Driver) {
 				finish(
 					start,
 					info.Error,
-					"lock", info.Lock,
-				)
-			}
-		}
-		t.OnConnRelease = func(info trace.ConnReleaseStartInfo) func(trace.ConnReleaseDoneInfo) {
-			start := startSpan(
-				info.Context,
-				"ydb_conn_release",
-			)
-			start.SetTag("address", info.Endpoint.Address())
-			start.SetTag("local", info.Endpoint.LocalDC())
-			return func(info trace.ConnReleaseDoneInfo) {
-				finish(
-					start,
-					nil,
-					"lock", info.Lock,
-				)
-			}
-		}
-		t.OnConnStateChange = func(info trace.ConnStateChangeStartInfo) func(trace.ConnStateChangeDoneInfo) {
-			start := startSpan(
-				info.Context,
-				"ydb_conn_state_change",
-				"state", info.State.String(),
-			)
-			start.SetTag("address", info.Endpoint.Address())
-			start.SetTag("local", info.Endpoint.LocalDC())
-			return func(info trace.ConnStateChangeDoneInfo) {
-				finish(
-					start,
-					nil,
-					"state", info.State.String(),
 				)
 			}
 		}
