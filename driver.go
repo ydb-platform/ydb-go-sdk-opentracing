@@ -18,14 +18,29 @@ func Driver(details trace.Details) (t trace.Driver) {
 			}
 		}
 	}
-	if details&trace.DriverCoreEvents != 0 {
+	if details&trace.DriverRepeaterEvents != 0 {
+		t.OnRepeaterWakeUp = func(info trace.RepeaterTickStartInfo) func(trace.RepeaterTickDoneInfo) {
+			start := startSpan(
+				info.Context,
+				"ydb_repeater_wake_up",
+			)
+			start.SetTag("name", info.Name)
+			start.SetTag("event", info.Event)
+			return func(info trace.RepeaterTickDoneInfo) {
+				finish(
+					start,
+					info.Error,
+				)
+			}
+		}
+	}
+	if details&trace.DriverConnEvents != 0 {
 		t.OnConnTake = func(info trace.ConnTakeStartInfo) func(trace.ConnTakeDoneInfo) {
 			start := startSpan(
 				info.Context,
 				"ydb_conn_take",
 			)
 			start.SetTag("address", info.Endpoint.Address())
-			start.SetTag("local", info.Endpoint.LocalDC())
 			return func(info trace.ConnTakeDoneInfo) {
 				finish(
 					start,
@@ -39,7 +54,6 @@ func Driver(details trace.Details) (t trace.Driver) {
 				"ydb_conn_invoke",
 			)
 			start.SetTag("address", info.Endpoint.Address())
-			start.SetTag("local", info.Endpoint.LocalDC())
 			start.SetTag("method", string(info.Method))
 			return func(info trace.ConnInvokeDoneInfo) {
 				finish(
@@ -56,7 +70,6 @@ func Driver(details trace.Details) (t trace.Driver) {
 				"ydb_conn_new_stream",
 			)
 			start.SetTag("address", info.Endpoint.Address())
-			start.SetTag("local", info.Endpoint.LocalDC())
 			start.SetTag("method", string(info.Method))
 			return func(info trace.ConnNewStreamRecvInfo) func(trace.ConnNewStreamDoneInfo) {
 				intermediate(start, info.Error)
@@ -67,6 +80,32 @@ func Driver(details trace.Details) (t trace.Driver) {
 						"state", info.State.String(),
 					)
 				}
+			}
+		}
+		t.OnConnPark = func(info trace.ConnParkStartInfo) func(trace.ConnParkDoneInfo) {
+			start := startSpan(
+				info.Context,
+				"ydb_conn_park",
+			)
+			start.SetTag("address", info.Endpoint.Address())
+			return func(info trace.ConnParkDoneInfo) {
+				finish(
+					start,
+					info.Error,
+				)
+			}
+		}
+		t.OnConnClose = func(info trace.ConnCloseStartInfo) func(trace.ConnCloseDoneInfo) {
+			start := startSpan(
+				info.Context,
+				"ydb_conn_close",
+			)
+			start.SetTag("address", info.Endpoint.Address())
+			return func(info trace.ConnCloseDoneInfo) {
+				finish(
+					start,
+					info.Error,
+				)
 			}
 		}
 	}
@@ -96,7 +135,6 @@ func Driver(details trace.Details) (t trace.Driver) {
 			)
 			return func(info trace.ClusterGetDoneInfo) {
 				start.SetTag("address", info.Endpoint.Address())
-				start.SetTag("local", info.Endpoint.LocalDC())
 				start.SetTag("nodeID", info.Endpoint.NodeID())
 				finish(start, info.Error)
 			}
@@ -107,7 +145,6 @@ func Driver(details trace.Details) (t trace.Driver) {
 				"ydb_cluster_insert",
 			)
 			start.SetTag("address", info.Endpoint.Address())
-			start.SetTag("local", info.Endpoint.LocalDC())
 			start.SetTag("nodeID", info.Endpoint.NodeID())
 			return func(info trace.ClusterInsertDoneInfo) {
 				finish(
@@ -123,7 +160,6 @@ func Driver(details trace.Details) (t trace.Driver) {
 				"ydb_cluster_remove",
 			)
 			start.SetTag("address", info.Endpoint.Address())
-			start.SetTag("local", info.Endpoint.LocalDC())
 			start.SetTag("nodeID", info.Endpoint.NodeID())
 			return func(info trace.ClusterRemoveDoneInfo) {
 				finish(
@@ -139,7 +175,6 @@ func Driver(details trace.Details) (t trace.Driver) {
 				"ydb_cluster_update",
 			)
 			start.SetTag("address", info.Endpoint.Address())
-			start.SetTag("local", info.Endpoint.LocalDC())
 			start.SetTag("nodeID", info.Endpoint.NodeID())
 			return func(info trace.ClusterUpdateDoneInfo) {
 				finish(
@@ -157,7 +192,6 @@ func Driver(details trace.Details) (t trace.Driver) {
 				"cause", info.Cause.Error(),
 			)
 			start.SetTag("address", info.Endpoint.Address())
-			start.SetTag("local", info.Endpoint.LocalDC())
 			start.SetTag("nodeID", info.Endpoint.NodeID())
 			return func(info trace.PessimizeNodeDoneInfo) {
 				finish(
