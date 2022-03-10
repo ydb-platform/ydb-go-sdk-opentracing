@@ -2,30 +2,30 @@ package tracing
 
 import (
 	"context"
-	"github.com/opentracing/opentracing-go/ext"
-	"github.com/opentracing/opentracing-go/log"
-	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"net/url"
 	"sync/atomic"
 
 	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
+	otlog "github.com/opentracing/opentracing-go/log"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
 
 func logError(s opentracing.Span, err error) {
 	s.SetTag(string(ext.Error), true)
-	s.LogFields(log.Error(err))
+	s.LogFields(otlog.Error(err))
 	m := retry.Check(err)
 	s.SetTag(string(ext.Error)+".retryable", m.MustRetry(false))
 	s.SetTag(string(ext.Error)+".delete_session", m.MustDeleteSession())
 	s.SetTag(string(ext.Error)+".backoff", m.BackoffType().String())
 }
 
-func finish(s opentracing.Span, err error, alternatingKeyValues ...interface{}) {
+func finish(s opentracing.Span, err error, fields ...otlog.Field) {
 	if err != nil {
 		logError(s, err)
 	}
-	s.LogKV(alternatingKeyValues...)
+	s.LogFields(fields...)
 	s.Finish()
 }
 

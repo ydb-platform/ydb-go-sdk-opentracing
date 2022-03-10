@@ -1,6 +1,7 @@
 package tracing
 
 import (
+	otlog "github.com/opentracing/opentracing-go/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -18,7 +19,7 @@ func Table(details trace.Details) (t trace.Table) {
 				return func(info trace.PoolDoDoneInfo) {
 					finish(start,
 						info.Error,
-						"attempts", info.Attempts,
+						otlog.Int("attempts", info.Attempts),
 					)
 				}
 			}
@@ -34,7 +35,7 @@ func Table(details trace.Details) (t trace.Table) {
 				return func(info trace.PoolDoTxDoneInfo) {
 					finish(start,
 						info.Error,
-						"attempts", info.Attempts,
+						otlog.Int("attempts", info.Attempts),
 					)
 				}
 			}
@@ -99,7 +100,7 @@ func Table(details trace.Details) (t trace.Table) {
 						finish(
 							start,
 							info.Error,
-							"result", info.Result.String(),
+							otlog.String("result", info.Result.String()),
 						)
 					}
 				}
@@ -120,9 +121,9 @@ func Table(details trace.Details) (t trace.Table) {
 						finish(
 							start,
 							info.Error,
-							"resultErr", info.Result.Err().Error(),
-							"prepared", info.Prepared,
-							"tx", info.Tx.ID(),
+							otlog.Error(info.Result.Err()),
+							otlog.Bool("prepared", info.Prepared),
+							otlog.String("tx", info.Tx.ID()),
 						)
 					}
 				}
@@ -232,8 +233,8 @@ func Table(details trace.Details) (t trace.Table) {
 					finish(
 						start,
 						nil,
-						"min", info.KeepAliveMinSize,
-						"max", info.Limit,
+						otlog.Int("limit", info.Limit),
+						otlog.Int("min", info.KeepAliveMinSize),
 					)
 				}
 			}
@@ -304,7 +305,7 @@ func Table(details trace.Details) (t trace.Table) {
 					finish(
 						start,
 						info.Error,
-						"attempts", info.Attempts,
+						otlog.Int("attempts", info.Attempts),
 					)
 				}
 			}
