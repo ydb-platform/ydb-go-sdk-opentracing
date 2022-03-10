@@ -1,6 +1,7 @@
 package tracing
 
 import (
+	otlog "github.com/opentracing/opentracing-go/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -59,8 +60,8 @@ func Driver(details trace.Details) (t trace.Driver) {
 				finish(
 					start,
 					info.Error,
-					"opID", info.OpID,
-					"state", info.State.String(),
+					otlog.String("opID", info.OpID),
+					otlog.String("state", info.State.String()),
 				)
 			}
 		}
@@ -77,7 +78,7 @@ func Driver(details trace.Details) (t trace.Driver) {
 					finish(
 						start,
 						info.Error,
-						"state", info.State.String(),
+						otlog.String("state", info.State.String()),
 					)
 				}
 			}
@@ -150,7 +151,7 @@ func Driver(details trace.Details) (t trace.Driver) {
 				finish(
 					start,
 					nil,
-					"state", info.State.String(),
+					otlog.String("state", info.State.String()),
 				)
 			}
 		}
@@ -165,7 +166,7 @@ func Driver(details trace.Details) (t trace.Driver) {
 				finish(
 					start,
 					nil,
-					"state", info.State.String(),
+					otlog.String("state", info.State.String()),
 				)
 			}
 		}
@@ -180,7 +181,7 @@ func Driver(details trace.Details) (t trace.Driver) {
 				finish(
 					start,
 					nil,
-					"state", info.State.String(),
+					otlog.String("state", info.State.String()),
 				)
 			}
 		}
@@ -197,7 +198,7 @@ func Driver(details trace.Details) (t trace.Driver) {
 				finish(
 					start,
 					nil,
-					"state", info.State.String(),
+					otlog.String("state", info.State.String()),
 				)
 			}
 		}

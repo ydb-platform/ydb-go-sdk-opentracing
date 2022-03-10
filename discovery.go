@@ -1,6 +1,7 @@
 package tracing
 
 import (
+	otlog "github.com/opentracing/opentracing-go/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -17,7 +18,7 @@ func Discovery(details trace.Details) (t trace.Discovery) {
 				finish(
 					start,
 					info.Error,
-					"endpoints", info.Endpoints,
+					otlog.Object("endpoints", info.Endpoints),
 				)
 			}
 		}
