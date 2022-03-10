@@ -97,11 +97,18 @@ func Table(details trace.Details) (t trace.Table) {
 					)
 					start.SetTag("nodeID", nodeID(info.Session.ID()))
 					return func(info trace.PrepareDataQueryDoneInfo) {
-						finish(
-							start,
-							info.Error,
-							otlog.String("result", info.Result.String()),
-						)
+						if info.Error == nil {
+							finish(
+								start,
+								nil,
+								otlog.String("result", info.Result.String()),
+							)
+						} else {
+							finish(
+								start,
+								info.Error,
+							)
+						}
 					}
 				}
 				t.OnSessionQueryExecute = func(
@@ -118,13 +125,21 @@ func Table(details trace.Details) (t trace.Table) {
 					)
 					start.SetTag("nodeID", nodeID(info.Session.ID()))
 					return func(info trace.ExecuteDataQueryDoneInfo) {
-						finish(
-							start,
-							info.Error,
-							otlog.Error(info.Result.Err()),
-							otlog.Bool("prepared", info.Prepared),
-							otlog.String("tx", info.Tx.ID()),
-						)
+						if info.Error == nil {
+							finish(
+								start,
+								info.Result.Err(),
+								otlog.Bool("prepared", info.Prepared),
+								otlog.String("tx", info.Tx.ID()),
+							)
+						} else {
+							finish(
+								start,
+								info.Error,
+								otlog.Bool("prepared", info.Prepared),
+								otlog.String("tx", info.Tx.ID()),
+							)
+						}
 					}
 				}
 			}
