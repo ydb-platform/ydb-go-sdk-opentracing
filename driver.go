@@ -224,6 +224,9 @@ func Driver(details trace.Details) (t trace.Driver) {
 				info.Context,
 				"ydb_driver_init",
 			)
+			start.SetTag("endpoint", info.Endpoint)
+			start.SetTag("database", info.Database)
+			start.SetTag("secure", info.Secure)
 			return func(info trace.InitDoneInfo) {
 				finish(start, info.Error)
 			}
