@@ -231,12 +231,12 @@ func Table(details trace.Details) (t trace.Table) {
 	}
 	if details&trace.TablePoolEvents != 0 {
 		if details&trace.TablePoolLifeCycleEvents != 0 {
-			t.OnPoolInit = func(info trace.PoolInitStartInfo) func(trace.PoolInitDoneInfo) {
+			t.OnInit = func(info trace.TableInitStartInfo) func(trace.TableInitDoneInfo) {
 				start := startSpan(
 					info.Context,
 					"ydb_table_pool_init",
 				)
-				return func(info trace.PoolInitDoneInfo) {
+				return func(info trace.TableInitDoneInfo) {
 					finish(
 						start,
 						nil,
@@ -245,12 +245,12 @@ func Table(details trace.Details) (t trace.Table) {
 					)
 				}
 			}
-			t.OnPoolClose = func(info trace.PoolCloseStartInfo) func(trace.PoolCloseDoneInfo) {
+			t.OnClose = func(info trace.TableCloseStartInfo) func(trace.TableCloseDoneInfo) {
 				start := startSpan(
 					info.Context,
 					"ydb_table_pool_close",
 				)
-				return func(info trace.PoolCloseDoneInfo) {
+				return func(info trace.TableCloseDoneInfo) {
 					finish(start, info.Error)
 				}
 			}

@@ -83,7 +83,6 @@ func main() {
 		creds,
 		ydb.WithSessionPoolSizeLimit(300),
 		ydb.WithSessionPoolIdleThreshold(time.Second*5),
-		ydb.WithLogger(trace.DetailsAll, ydb.WithMinLevel(ydb.TRACE)),
 		tracing.WithTraces(trace.DetailsAll),
 	)
 	if err != nil {
