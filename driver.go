@@ -2,7 +2,10 @@ package tracing
 
 import (
 	otlog "github.com/opentracing/opentracing-go/log"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+
+	"github.com/ydb-platform/ydb-go-sdk-opentracing/internal/safe"
 )
 
 // Driver makes Driver with publishing traces
@@ -41,7 +44,7 @@ func Driver(details trace.Details) (t trace.Driver) {
 				info.Context,
 				"ydb_conn_take",
 			)
-			start.SetTag("address", info.Endpoint.Address())
+			start.SetTag("address", safe.Address(info.Endpoint))
 			return func(info trace.ConnTakeDoneInfo) {
 				finish(
 					start,
@@ -54,14 +57,15 @@ func Driver(details trace.Details) (t trace.Driver) {
 				info.Context,
 				"ydb_conn_invoke",
 			)
-			start.SetTag("address", info.Endpoint.Address())
+			start.SetTag("address", safe.Address(info.Endpoint))
 			start.SetTag("method", string(info.Method))
 			return func(info trace.ConnInvokeDoneInfo) {
 				finish(
 					start,
 					info.Error,
+					otlog.Object("issues", info.Issues),
 					otlog.String("opID", info.OpID),
-					otlog.String("state", info.State.String()),
+					otlog.String("state", safe.Stringer(info.State)),
 				)
 			}
 		}
@@ -70,7 +74,7 @@ func Driver(details trace.Details) (t trace.Driver) {
 				info.Context,
 				"ydb_conn_new_stream",
 			)
-			start.SetTag("address", info.Endpoint.Address())
+			start.SetTag("address", safe.Address(info.Endpoint))
 			start.SetTag("method", string(info.Method))
 			return func(info trace.ConnNewStreamRecvInfo) func(trace.ConnNewStreamDoneInfo) {
 				intermediate(start, info.Error)
@@ -78,7 +82,7 @@ func Driver(details trace.Details) (t trace.Driver) {
 					finish(
 						start,
 						info.Error,
-						otlog.String("state", info.State.String()),
+						otlog.String("state", safe.Stringer(info.State)),
 					)
 				}
 			}
@@ -88,7 +92,7 @@ func Driver(details trace.Details) (t trace.Driver) {
 				info.Context,
 				"ydb_conn_park",
 			)
-			start.SetTag("address", info.Endpoint.Address())
+			start.SetTag("address", safe.Address(info.Endpoint))
 			return func(info trace.ConnParkDoneInfo) {
 				finish(
 					start,
@@ -101,7 +105,7 @@ func Driver(details trace.Details) (t trace.Driver) {
 				info.Context,
 				"ydb_conn_close",
 			)
-			start.SetTag("address", info.Endpoint.Address())
+			start.SetTag("address", safe.Address(info.Endpoint))
 			return func(info trace.ConnCloseDoneInfo) {
 				finish(
 					start,
@@ -135,8 +139,10 @@ func Driver(details trace.Details) (t trace.Driver) {
 				"ydb_cluster_get",
 			)
 			return func(info trace.ClusterGetDoneInfo) {
-				start.SetTag("address", info.Endpoint.Address())
-				start.SetTag("nodeID", info.Endpoint.NodeID())
+				if info.Error == nil {
+					start.SetTag("address", safe.Address(info.Endpoint))
+					start.SetTag("nodeID", safe.NodeID(info.Endpoint))
+				}
 				finish(start, info.Error)
 			}
 		}
@@ -145,13 +151,13 @@ func Driver(details trace.Details) (t trace.Driver) {
 				info.Context,
 				"ydb_cluster_insert",
 			)
-			start.SetTag("address", info.Endpoint.Address())
-			start.SetTag("nodeID", info.Endpoint.NodeID())
+			start.SetTag("address", safe.Address(info.Endpoint))
+			start.SetTag("nodeID", safe.NodeID(info.Endpoint))
 			return func(info trace.ClusterInsertDoneInfo) {
 				finish(
 					start,
 					nil,
-					otlog.String("state", info.State.String()),
+					otlog.String("state", safe.Stringer(info.State)),
 				)
 			}
 		}
@@ -160,13 +166,13 @@ func Driver(details trace.Details) (t trace.Driver) {
 				info.Context,
 				"ydb_cluster_remove",
 			)
-			start.SetTag("address", info.Endpoint.Address())
-			start.SetTag("nodeID", info.Endpoint.NodeID())
+			start.SetTag("address", safe.Address(info.Endpoint))
+			start.SetTag("nodeID", safe.NodeID(info.Endpoint))
 			return func(info trace.ClusterRemoveDoneInfo) {
 				finish(
 					start,
 					nil,
-					otlog.String("state", info.State.String()),
+					otlog.String("state", safe.Stringer(info.State)),
 				)
 			}
 		}
@@ -175,13 +181,13 @@ func Driver(details trace.Details) (t trace.Driver) {
 				info.Context,
 				"ydb_cluster_update",
 			)
-			start.SetTag("address", info.Endpoint.Address())
-			start.SetTag("nodeID", info.Endpoint.NodeID())
+			start.SetTag("address", safe.Address(info.Endpoint))
+			start.SetTag("nodeID", safe.NodeID(info.Endpoint))
 			return func(info trace.ClusterUpdateDoneInfo) {
 				finish(
 					start,
 					nil,
-					otlog.String("state", info.State.String()),
+					otlog.String("state", safe.Stringer(info.State)),
 				)
 			}
 		}
@@ -189,16 +195,16 @@ func Driver(details trace.Details) (t trace.Driver) {
 			start := startSpan(
 				info.Context,
 				"ydb_cluster_pessimize",
-				"state", info.State.String(),
-				"cause", info.Cause.Error(),
+				otlog.String("state", safe.Stringer(info.State)),
+				otlog.String("cause", safe.Error(info.Cause)),
 			)
-			start.SetTag("address", info.Endpoint.Address())
-			start.SetTag("nodeID", info.Endpoint.NodeID())
+			start.SetTag("address", safe.Address(info.Endpoint))
+			start.SetTag("nodeID", safe.NodeID(info.Endpoint))
 			return func(info trace.PessimizeNodeDoneInfo) {
 				finish(
 					start,
 					nil,
-					otlog.String("state", info.State.String()),
+					otlog.String("state", safe.Stringer(info.State)),
 				)
 			}
 		}

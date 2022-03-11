@@ -29,11 +29,11 @@ func finish(s opentracing.Span, err error, fields ...otlog.Field) {
 	s.Finish()
 }
 
-func intermediate(s opentracing.Span, err error, alternatingKeyValues ...interface{}) {
+func intermediate(s opentracing.Span, err error, fields ...otlog.Field) {
 	if err != nil {
 		logError(s, err)
 	}
-	s.LogKV(alternatingKeyValues...)
+	s.LogFields(fields...)
 }
 
 type counter struct {
@@ -44,21 +44,23 @@ type counter struct {
 
 func (s *counter) add(delta int64) {
 	atomic.AddInt64(&s.counter, delta)
-	s.span.LogKV(s.name, atomic.LoadInt64(&s.counter))
+	s.span.LogFields(
+		otlog.Int64(s.name, atomic.LoadInt64(&s.counter)),
+	)
 }
 
-func startSpanWithCounter(ctx *context.Context, operationName string, counterName string, alternatingKeyValues ...interface{}) (c *counter) {
+func startSpanWithCounter(ctx *context.Context, operationName string, counterName string, fields ...otlog.Field) (c *counter) {
 	defer func() {
 		c.span.SetTag("ydb.driver.sensor", operationName+"_"+counterName)
 	}()
 	return &counter{
-		span:    startSpan(ctx, operationName, alternatingKeyValues...),
+		span:    startSpan(ctx, operationName, fields...),
 		counter: 0,
 		name:    counterName,
 	}
 }
 
-func startSpan(ctx *context.Context, operationName string, alternatingKeyValues ...interface{}) (s opentracing.Span) {
+func startSpan(ctx *context.Context, operationName string, fields ...otlog.Field) (s opentracing.Span) {
 	if ctx != nil {
 		var childCtx context.Context
 		s, childCtx = opentracing.StartSpanFromContext(*ctx, operationName)
@@ -68,7 +70,7 @@ func startSpan(ctx *context.Context, operationName string, alternatingKeyValues 
 	}
 	s.SetTag("scope", "ydb")
 	s.SetTag("version", ydb.Version)
-	s.LogKV(alternatingKeyValues...)
+	s.LogFields(fields...)
 	return s
 }
 
