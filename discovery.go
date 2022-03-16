@@ -7,14 +7,14 @@ import (
 
 func Discovery(details trace.Details) (t trace.Discovery) {
 	if details&trace.DiscoveryEvents != 0 {
-		t.OnDiscover = func(info trace.DiscoverStartInfo) func(trace.DiscoverDoneInfo) {
+		t.OnDiscover = func(info trace.DiscoveryDiscoverStartInfo) func(discovery trace.DiscoveryDiscoverDoneInfo) {
 			start := startSpan(
 				info.Context,
 				"ydb_discovery",
 			)
 			start.SetTag("address", info.Address)
 			start.SetTag("database", info.Database)
-			return func(info trace.DiscoverDoneInfo) {
+			return func(info trace.DiscoveryDiscoverDoneInfo) {
 				finish(
 					start,
 					info.Error,
