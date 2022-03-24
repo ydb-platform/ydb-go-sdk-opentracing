@@ -176,21 +176,6 @@ func Driver(details trace.Details) (t trace.Driver) {
 				)
 			}
 		}
-		t.OnClusterUpdate = func(info trace.DriverClusterUpdateStartInfo) func(trace.DriverClusterUpdateDoneInfo) {
-			start := startSpan(
-				info.Context,
-				"ydb_cluster_update",
-			)
-			start.SetTag("address", safe.Address(info.Endpoint))
-			start.SetTag("nodeID", safe.NodeID(info.Endpoint))
-			return func(info trace.DriverClusterUpdateDoneInfo) {
-				finish(
-					start,
-					nil,
-					otlog.String("state", safe.Stringer(info.State)),
-				)
-			}
-		}
 		t.OnPessimizeNode = func(info trace.DriverPessimizeNodeStartInfo) func(trace.DriverPessimizeNodeDoneInfo) {
 			start := startSpan(
 				info.Context,
