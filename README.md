@@ -29,9 +29,9 @@ import (
         panic(err)
     }
 
-    db, err := ydb.New(
+    db, err := ydb.Open(
         ctx,
-        ydb.MustConnectionString(connection),
+        os.Getenv("YDB_CONNECTION_STRING"),
         ydbOpentracing.WithTraces(
             ydbOpentracing.WithDetails(trace.DetailsAll),
         ),

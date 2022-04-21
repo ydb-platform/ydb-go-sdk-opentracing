@@ -75,9 +75,9 @@ func main() {
 	if v, has := os.LookupEnv("YDB_ANONYMOUS_CREDENTIALS"); has && v == "1" {
 		creds = ydb.WithAnonymousCredentials()
 	}
-	db, err := ydb.New(
+	db, err := ydb.Open(
 		ctx,
-		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
+		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithDialTimeout(5*time.Second),
 		ydb.WithBalancer(balancers.RandomChoice()),
 		creds,
