@@ -23,14 +23,14 @@ func Driver(details trace.Details) (t trace.Driver) {
 		}
 	}
 	if details&trace.DriverRepeaterEvents != 0 {
-		t.OnRepeaterWakeUp = func(info trace.DriverRepeaterTickStartInfo) func(trace.DriverRepeaterTickDoneInfo) {
+		t.OnRepeaterWakeUp = func(info trace.DriverRepeaterWakeUpStartInfo) func(trace.DriverRepeaterWakeUpDoneInfo) {
 			start := startSpan(
 				info.Context,
 				"ydb_repeater_wake_up",
 			)
 			start.SetTag("name", info.Name)
 			start.SetTag("event", info.Event)
-			return func(info trace.DriverRepeaterTickDoneInfo) {
+			return func(info trace.DriverRepeaterWakeUpDoneInfo) {
 				finish(
 					start,
 					info.Error,
