@@ -113,6 +113,39 @@ func Driver(details trace.Details) (t trace.Driver) {
 				)
 			}
 		}
+		t.OnConnBan = func(info trace.DriverConnBanStartInfo) func(trace.DriverConnBanDoneInfo) {
+			start := startSpan(
+				info.Context,
+				"ydb_conn_ban",
+				otlog.String("state", safe.Stringer(info.State)),
+				otlog.String("cause", safe.Error(info.Cause)),
+			)
+			start.SetTag("address", safe.Address(info.Endpoint))
+			start.SetTag("nodeID", safe.NodeID(info.Endpoint))
+			return func(info trace.DriverConnBanDoneInfo) {
+				finish(
+					start,
+					nil,
+					otlog.String("state", safe.Stringer(info.State)),
+				)
+			}
+		}
+		t.OnConnAllow = func(info trace.DriverConnAllowStartInfo) func(trace.DriverConnAllowDoneInfo) {
+			start := startSpan(
+				info.Context,
+				"ydb_conn_allow",
+				otlog.String("state", safe.Stringer(info.State)),
+			)
+			start.SetTag("address", safe.Address(info.Endpoint))
+			start.SetTag("nodeID", safe.NodeID(info.Endpoint))
+			return func(info trace.DriverConnAllowDoneInfo) {
+				finish(
+					start,
+					nil,
+					otlog.String("state", safe.Stringer(info.State)),
+				)
+			}
+		}
 	}
 	if details&trace.DriverClusterEvents != 0 {
 		t.OnClusterInit = func(info trace.DriverClusterInitStartInfo) func(trace.DriverClusterInitDoneInfo) {
@@ -144,53 +177,6 @@ func Driver(details trace.Details) (t trace.Driver) {
 					start.SetTag("nodeID", safe.NodeID(info.Endpoint))
 				}
 				finish(start, info.Error)
-			}
-		}
-		t.OnClusterInsert = func(info trace.DriverClusterInsertStartInfo) func(trace.DriverClusterInsertDoneInfo) {
-			start := startSpan(
-				info.Context,
-				"ydb_cluster_insert",
-			)
-			start.SetTag("address", safe.Address(info.Endpoint))
-			start.SetTag("nodeID", safe.NodeID(info.Endpoint))
-			return func(info trace.DriverClusterInsertDoneInfo) {
-				finish(
-					start,
-					nil,
-					otlog.String("state", safe.Stringer(info.State)),
-				)
-			}
-		}
-		t.OnClusterRemove = func(info trace.DriverClusterRemoveStartInfo) func(trace.DriverClusterRemoveDoneInfo) {
-			start := startSpan(
-				info.Context,
-				"ydb_cluster_remove",
-			)
-			start.SetTag("address", safe.Address(info.Endpoint))
-			start.SetTag("nodeID", safe.NodeID(info.Endpoint))
-			return func(info trace.DriverClusterRemoveDoneInfo) {
-				finish(
-					start,
-					nil,
-					otlog.String("state", safe.Stringer(info.State)),
-				)
-			}
-		}
-		t.OnPessimizeNode = func(info trace.DriverPessimizeNodeStartInfo) func(trace.DriverPessimizeNodeDoneInfo) {
-			start := startSpan(
-				info.Context,
-				"ydb_cluster_pessimize",
-				otlog.String("state", safe.Stringer(info.State)),
-				otlog.String("cause", safe.Error(info.Cause)),
-			)
-			start.SetTag("address", safe.Address(info.Endpoint))
-			start.SetTag("nodeID", safe.NodeID(info.Endpoint))
-			return func(info trace.DriverPessimizeNodeDoneInfo) {
-				finish(
-					start,
-					nil,
-					otlog.String("state", safe.Stringer(info.State)),
-				)
 			}
 		}
 	}
