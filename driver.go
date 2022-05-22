@@ -147,31 +147,44 @@ func Driver(details trace.Details) (t trace.Driver) {
 			}
 		}
 	}
-	if details&trace.DriverClusterEvents != 0 {
-		t.OnClusterInit = func(info trace.DriverClusterInitStartInfo) func(trace.DriverClusterInitDoneInfo) {
+	if details&trace.DriverBalancerEvents != 0 {
+		t.OnBalancerInit = func(info trace.DriverBalancerInitStartInfo) func(trace.DriverBalancerInitDoneInfo) {
 			start := startSpan(
 				info.Context,
-				"ydb_cluster_init",
+				"ydb_balancer_init",
 			)
-			return func(info trace.DriverClusterInitDoneInfo) {
+			return func(info trace.DriverBalancerInitDoneInfo) {
 				finish(start, nil)
 			}
 		}
-		t.OnClusterClose = func(info trace.DriverClusterCloseStartInfo) func(trace.DriverClusterCloseDoneInfo) {
+		t.OnBalancerClose = func(info trace.DriverBalancerCloseStartInfo) func(trace.DriverBalancerCloseDoneInfo) {
 			start := startSpan(
 				info.Context,
-				"ydb_cluster_close",
+				"ydb_balancer_close",
 			)
-			return func(info trace.DriverClusterCloseDoneInfo) {
+			return func(info trace.DriverBalancerCloseDoneInfo) {
 				finish(start, info.Error)
 			}
 		}
-		t.OnClusterGet = func(info trace.DriverClusterGetStartInfo) func(trace.DriverClusterGetDoneInfo) {
+		t.OnBalancerUpdate = func(info trace.DriverBalancerUpdateStartInfo) func(trace.DriverBalancerUpdateDoneInfo) {
 			start := startSpan(
 				info.Context,
-				"ydb_cluster_get",
+				"ydb_balancer_update",
 			)
-			return func(info trace.DriverClusterGetDoneInfo) {
+			start.SetTag("need_local_dc", info.NeedLocalDC)
+			return func(info trace.DriverBalancerUpdateDoneInfo) {
+				start.SetTag("local_dc", info.LocalDC)
+				finish(start, info.Error,
+					otlog.Object("endpoints", info.Endpoints),
+				)
+			}
+		}
+		t.OnBalancerChooseEndpoint = func(info trace.DriverBalancerChooseEndpointStartInfo) func(trace.DriverBalancerChooseEndpointDoneInfo) {
+			start := startSpan(
+				info.Context,
+				"ydb_balancer_get",
+			)
+			return func(info trace.DriverBalancerChooseEndpointDoneInfo) {
 				if info.Error == nil {
 					start.SetTag("address", safe.Address(info.Endpoint))
 					start.SetTag("nodeID", safe.NodeID(info.Endpoint))
