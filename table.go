@@ -271,32 +271,7 @@ func Table(details trace.Details) (t trace.Table) {
 			}
 		}
 		if details&trace.TablePoolSessionLifeCycleEvents != 0 {
-			t.OnPoolSessionNew = func(info trace.TablePoolSessionNewStartInfo) func(trace.TablePoolSessionNewDoneInfo) {
-				start := startSpan(
-					info.Context,
-					"ydb_table_pool_session_new",
-				)
-				return func(info trace.TablePoolSessionNewDoneInfo) {
-					start.SetTag("nodeID", nodeID(safe.ID(info.Session)))
-					finish(
-						start,
-						info.Error,
-						otlog.String("id", safe.ID(info.Session)),
-						otlog.String("status", safe.Status(info.Session)),
-					)
-				}
-			}
-			t.OnPoolSessionClose = func(info trace.TablePoolSessionCloseStartInfo) func(trace.TablePoolSessionCloseDoneInfo) {
-				start := startSpan(
-					info.Context,
-					"ydb_table_pool_session_close",
-					otlog.String("id", safe.ID(info.Session)),
-				)
-				start.SetTag("nodeID", nodeID(safe.ID(info.Session)))
-				return func(info trace.TablePoolSessionCloseDoneInfo) {
-					finish(start, nil)
-				}
-			}
+			// nop
 		}
 		if details&trace.TablePoolAPIEvents != 0 {
 			t.OnPoolPut = func(info trace.TablePoolPutStartInfo) func(trace.TablePoolPutDoneInfo) {
