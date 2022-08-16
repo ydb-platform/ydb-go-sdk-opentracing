@@ -32,6 +32,8 @@ github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7
 github.com/fogleman/gg v1.2.1-0.20190220221249-0403632d5b90/go.mod h1:R/bRT+9gY/C5z7JzPU0zXsXHKM4/ayA+zqcVNZzPa1k=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
 github.com/go-gl/glfw v0.0.0-20190409004039-e6da0acd62b1/go.mod h1:vR7hzQXu2zJy9AVAgeJqvqgH9Q5CA+iKCZ2gyEVpxRU=
+github.com/golang-jwt/jwt/v4 v4.4.1 h1:pC5DB52sCeK48Wlb9oPcdhnjkz1TKt1D/P7WKJ0kUcQ=
+github.com/golang-jwt/jwt/v4 v4.4.1/go.mod h1:m21LjoU+eqJr34lmDMbreY2eSTRJ1cv77w39/MY0Ch0=
 github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0/go.mod h1:E/TSTwGwJL78qG/PmXZO1EjYhfJinVAhrmmHX6Z8B9k=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfUlaOkMMuAQtPIUF8ecWP5IEl/CR7VP2Q=
 github.com/golang/mock v1.1.1/go.mod h1:oTYuIxOrZwtPieC+H1uAHpcLFnEyAGVDL/k47Jfbm0A=
@@ -102,6 +104,8 @@ github.com/ydb-platform/ydb-go-sdk/v3 v3.26.0 h1:ivLqAMy3ug6yojDJZNZNVgyAqEoxv8X
 github.com/ydb-platform/ydb-go-sdk/v3 v3.26.0/go.mod h1:u23Hb2riQVwNQPna0TNvFIInM2izrAPoxwiXsODiyIg=
 github.com/ydb-platform/ydb-go-sdk/v3 v3.33.0 h1:QFnPdbWa/Qyzm5OPjANdFpwna0ZV07EDFKhPbZF5Bek=
 github.com/ydb-platform/ydb-go-sdk/v3 v3.33.0/go.mod h1:Fc5/F1O8RidZ1XcOSGMKZytR5G9Sad2QwJ+Z8y0u4Ts=
+github.com/ydb-platform/ydb-go-sdk/v3 v3.34.0 h1:qBbCMkvn/Uz1AVs7icKg7Y6e/znkQXkjZHwminjiz9A=
+github.com/ydb-platform/ydb-go-sdk/v3 v3.34.0/go.mod h1:eD5OyVA8MuMq3+BYBMKGUfa2faTZhbx+LE+y1RgitFE=
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
 go.opentelemetry.io/proto/otlp v0.7.0/go.mod h1:PqfVotwruBrMGOCsRd/89rSnXhoiJIqeYNgFYFoEGnI=
 go.uber.org/atomic v1.9.0 h1:ECmE8Bn/WFTYwEW/bpKD3M8VtR/zQVbavAoalC1PYyE=
