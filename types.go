@@ -16,9 +16,10 @@ func logError(s opentracing.Span, err error) {
 	s.SetTag(string(ext.Error), true)
 	s.LogFields(otlog.Error(err))
 	m := retry.Check(err)
-	s.SetTag(string(ext.Error)+".retryable", m.MustRetry(false))
+	if v := s.BaggageItem("idempotent"); v != "" {
+		s.SetTag(string(ext.Error)+".retryable", m.MustRetry(v == "true"))
+	}
 	s.SetTag(string(ext.Error)+".delete_session", m.MustDeleteSession())
-	s.SetTag(string(ext.Error)+".backoff", m.BackoffType().String())
 }
 
 func finish(s opentracing.Span, err error, fields ...otlog.Field) {
@@ -68,8 +69,20 @@ func startSpan(ctx *context.Context, operationName string, fields ...otlog.Field
 	} else {
 		s = opentracing.StartSpan(operationName)
 	}
-	s.SetTag("scope", "ydb")
-	s.SetTag("version", ydb.Version)
+	s.SetTag("ydb-go-sdk", "v"+ydb.Version)
+	s.LogFields(fields...)
+	return s
+}
+
+func followSpan(related opentracing.SpanContext, ctx *context.Context, operationName string, fields ...otlog.Field) (s opentracing.Span) {
+	if ctx != nil {
+		var childCtx context.Context
+		s, childCtx = opentracing.StartSpanFromContext(*ctx, operationName, opentracing.FollowsFrom(related))
+		*ctx = childCtx
+	} else {
+		s = opentracing.StartSpan(operationName)
+	}
+	s.SetTag("ydb-go-sdk", "v"+ydb.Version)
 	s.LogFields(fields...)
 	return s
 }

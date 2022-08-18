@@ -1,6 +1,10 @@
 package tracing
 
 import (
+	"github.com/opentracing/opentracing-go"
+	otlog "github.com/opentracing/opentracing-go/log"
+	"github.com/ydb-platform/ydb-go-sdk-opentracing/internal/safe"
+	"github.com/ydb-platform/ydb-go-sdk-opentracing/internal/str"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -46,22 +50,11 @@ func DatabaseSQL(details trace.Details) (t trace.DatabaseSQL) {
 				)
 			}
 		}
-		t.OnConnBegin = func(info trace.DatabaseSQLConnBeginStartInfo) func(trace.DatabaseSQLConnBeginDoneInfo) {
-			start := startSpan(
-				info.Context,
-				prefix+"_begin",
-			)
-			return func(info trace.DatabaseSQLConnBeginDoneInfo) {
-				finish(
-					start,
-					info.Error,
-				)
-			}
-		}
 		t.OnConnPrepare = func(info trace.DatabaseSQLConnPrepareStartInfo) func(trace.DatabaseSQLConnPrepareDoneInfo) {
 			start := startSpan(
 				info.Context,
 				prefix+"_prepare",
+				otlog.String("query", info.Query),
 			)
 			return func(info trace.DatabaseSQLConnPrepareDoneInfo) {
 				finish(
@@ -74,7 +67,10 @@ func DatabaseSQL(details trace.Details) (t trace.DatabaseSQL) {
 			start := startSpan(
 				info.Context,
 				prefix+"_exec",
+				otlog.String("query", info.Query),
+				otlog.String("query_mode", info.Mode),
 			)
+			start.SetBaggageItem("idempotent", str.Bool(info.Idempotent))
 			return func(info trace.DatabaseSQLConnExecDoneInfo) {
 				finish(
 					start,
@@ -86,8 +82,87 @@ func DatabaseSQL(details trace.Details) (t trace.DatabaseSQL) {
 			start := startSpan(
 				info.Context,
 				prefix+"_query",
+				otlog.String("query", info.Query),
+				otlog.String("query_mode", info.Mode),
 			)
+			start.SetBaggageItem("idempotent", str.Bool(info.Idempotent))
 			return func(info trace.DatabaseSQLConnQueryDoneInfo) {
+				finish(
+					start,
+					info.Error,
+				)
+			}
+		}
+	}
+	//nolint:nestif
+	if details&trace.DatabaseSQLConnEvents != 0 {
+		//nolint:govet
+		prefix := prefix + "_tx"
+		t.OnConnBegin = func(info trace.DatabaseSQLConnBeginStartInfo) func(trace.DatabaseSQLConnBeginDoneInfo) {
+			start := startSpan(
+				info.Context,
+				prefix+"_begin",
+			)
+			return func(info trace.DatabaseSQLConnBeginDoneInfo) {
+				start.SetTag("transaction_id", safe.ID(info.Tx))
+				finish(
+					start,
+					info.Error,
+				)
+			}
+		}
+		t.OnTxRollback = func(info trace.DatabaseSQLTxRollbackStartInfo) func(trace.DatabaseSQLTxRollbackDoneInfo) {
+			start := startSpan(
+				info.Context,
+				prefix+"_rollback",
+			)
+			start.SetTag("transaction_id", safe.ID(info.Tx))
+			return func(info trace.DatabaseSQLTxRollbackDoneInfo) {
+				finish(
+					start,
+					info.Error,
+				)
+			}
+		}
+		t.OnTxCommit = func(info trace.DatabaseSQLTxCommitStartInfo) func(trace.DatabaseSQLTxCommitDoneInfo) {
+			start := startSpan(
+				info.Context,
+				prefix+"_commit",
+			)
+			start.SetTag("transaction_id", safe.ID(info.Tx))
+			return func(info trace.DatabaseSQLTxCommitDoneInfo) {
+				finish(
+					start,
+					info.Error,
+				)
+			}
+		}
+		t.OnTxExec = func(info trace.DatabaseSQLTxExecStartInfo) func(trace.DatabaseSQLTxExecDoneInfo) {
+			start := followSpan(
+				opentracing.SpanFromContext(info.TxContext).Context(),
+				info.Context,
+				prefix+"_exec",
+				otlog.String("query", info.Query),
+			)
+			start.SetTag("transaction_id", safe.ID(info.Tx))
+			start.SetBaggageItem("idempotent", str.Bool(info.Idempotent))
+			return func(info trace.DatabaseSQLTxExecDoneInfo) {
+				finish(
+					start,
+					info.Error,
+				)
+			}
+		}
+		t.OnTxQuery = func(info trace.DatabaseSQLTxQueryStartInfo) func(trace.DatabaseSQLTxQueryDoneInfo) {
+			start := followSpan(
+				opentracing.SpanFromContext(info.TxContext).Context(),
+				info.Context,
+				prefix+"_query",
+				otlog.String("query", info.Query),
+			)
+			start.SetTag("transaction_id", safe.ID(info.Tx))
+			start.SetBaggageItem("idempotent", str.Bool(info.Idempotent))
+			return func(info trace.DatabaseSQLTxQueryDoneInfo) {
 				finish(
 					start,
 					info.Error,
@@ -103,6 +178,7 @@ func DatabaseSQL(details trace.Details) (t trace.DatabaseSQL) {
 			start := startSpan(
 				info.Context,
 				prefix+"_exec",
+				otlog.String("query", info.Query),
 			)
 			return func(info trace.DatabaseSQLStmtExecDoneInfo) {
 				finish(
@@ -115,6 +191,7 @@ func DatabaseSQL(details trace.Details) (t trace.DatabaseSQL) {
 			start := startSpan(
 				info.Context,
 				prefix+"_query",
+				otlog.String("query", info.Query),
 			)
 			return func(info trace.DatabaseSQLStmtQueryDoneInfo) {
 				finish(
