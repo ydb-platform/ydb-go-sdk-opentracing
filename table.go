@@ -284,7 +284,6 @@ func Table(details trace.Details) (t trace.Table) {
 						start,
 						nil,
 						otlog.Int("limit", info.Limit),
-						otlog.Int("min", info.KeepAliveMinSize),
 					)
 				}
 			}
