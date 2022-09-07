@@ -112,6 +112,8 @@ github.com/ydb-platform/ydb-go-sdk/v3 v3.34.2 h1:Zx3HgDQIbq5NO9YFV0rTCQxyF/mVRZA
 github.com/ydb-platform/ydb-go-sdk/v3 v3.34.2/go.mod h1:eD5OyVA8MuMq3+BYBMKGUfa2faTZhbx+LE+y1RgitFE=
 github.com/ydb-platform/ydb-go-sdk/v3 v3.35.1 h1:+DTSx1uMFMtNHEpC1ZyM6t2vaBQCnymqHV1+/abZDWM=
 github.com/ydb-platform/ydb-go-sdk/v3 v3.35.1/go.mod h1:eD5OyVA8MuMq3+BYBMKGUfa2faTZhbx+LE+y1RgitFE=
+github.com/ydb-platform/ydb-go-sdk/v3 v3.37.6 h1:1gYA/jAVOXhKu714HfwTPlkfrucg+Ctsw0NtjirrCVU=
+github.com/ydb-platform/ydb-go-sdk/v3 v3.37.6/go.mod h1:eD5OyVA8MuMq3+BYBMKGUfa2faTZhbx+LE+y1RgitFE=
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
 go.opentelemetry.io/proto/otlp v0.7.0/go.mod h1:PqfVotwruBrMGOCsRd/89rSnXhoiJIqeYNgFYFoEGnI=
 go.uber.org/atomic v1.9.0 h1:ECmE8Bn/WFTYwEW/bpKD3M8VtR/zQVbavAoalC1PYyE=

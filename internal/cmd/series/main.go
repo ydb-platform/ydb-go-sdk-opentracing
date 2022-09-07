@@ -3,39 +3,31 @@ package main
 import (
 	"context"
 	"database/sql"
-	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"log"
-	"math/rand"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"path"
-	"strconv"
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/opentracing/opentracing-go"
 	jaegerConfig "github.com/uber/jaeger-client-go/config"
 
+	ydbTracing "github.com/ydb-platform/ydb-go-sdk-opentracing"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-
-	tracing "github.com/ydb-platform/ydb-go-sdk-opentracing"
+	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 )
-
-func init() {
-	http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 500
-}
 
 const (
 	tracerURL   = "localhost:5775"
 	serviceName = "bench"
 	prefix      = "ydb-go-sdk-opentracing/bench/database-sql"
 )
+
+func init() {
+	http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 500
+}
 
 func main() {
 	tracer, closer, err := jaegerConfig.Configuration{
@@ -62,259 +54,79 @@ func main() {
 	span, ctx := opentracing.StartSpanFromContext(context.Background(), "client")
 	defer span.Finish()
 
-	creds := ydb.WithAnonymousCredentials()
-	if token, has := os.LookupEnv("YDB_ACCESS_TOKEN_CREDENTIALS"); has {
-		creds = ydb.WithAccessTokenCredentials(token)
-	}
-	cc, err := ydb.Open(
-		ctx,
-		os.Getenv("YDB_CONNECTION_STRING"),
-		ydb.WithDialTimeout(5*time.Second),
-		ydb.WithBalancer(balancers.RandomChoice()),
-		creds,
-		ydb.WithSessionPoolSizeLimit(300),
-		ydb.WithSessionPoolIdleThreshold(time.Second*5),
-		tracing.WithTraces(trace.DatabaseSQLEvents|trace.TableEvents),
+	nativeDriver, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"),
+		ydb.WithDiscoveryInterval(5*time.Second),
+		ydbTracing.WithTraces(trace.DetailsAll),
 	)
 	if err != nil {
-		panic(err)
+		log.Fatalf("connect error: %v", err)
 	}
-	defer func() {
-		_ = cc.Close(ctx)
-	}()
+	defer func() { _ = nativeDriver.Close(ctx) }()
 
-	connector, err := ydb.Connector(cc)
+	connector, err := ydb.Connector(nativeDriver)
 	if err != nil {
-		panic(err)
+		log.Fatalf("create connector failed: %v", err)
 	}
 
 	db := sql.OpenDB(connector)
-	defer func() {
-		_ = db.Close()
-	}()
+	defer func() { _ = db.Close() }()
 
-	db.SetMaxOpenConns(1000)
-	db.SetMaxIdleConns(1000)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	if v, err := strconv.Atoi(os.Getenv("YDB_PREPARE_SCHEME")); err != nil || v != 0 {
-		if err = prepareSchema(ctx, db, path.Join(cc.Name(), prefix)); err != nil {
-			log.Fatal(err)
-		}
+	cc, err := ydb.Unwrap(db)
+	if err != nil {
+		log.Fatalf("unwrap failed: %v", err)
 	}
 
-	if concurrency, err := strconv.Atoi(os.Getenv("YDB_PREPARE_DATA_CONCURRENCY")); err != nil || concurrency != 0 {
-		if concurrency == 0 {
-			concurrency = 100
-		}
-		if err = upsertData(ctx, db, path.Join(cc.Name(), prefix), concurrency); err != nil {
-			log.Fatal(err)
-		}
+	prefix := path.Join(cc.Name(), prefix)
+
+	err = sugar.RemoveRecursive(ctx, cc, prefix)
+	if err != nil {
+		log.Fatalf("remove recursive failed: %v", err)
 	}
 
-	if concurrency, err := strconv.Atoi(os.Getenv("YDB_READ_DATA_CONCURRENCY")); err != nil || concurrency != 0 {
-		if concurrency == 0 {
-			concurrency = 100
-		}
-
-		wg := sync.WaitGroup{}
-		sema := make(chan struct{}, concurrency)
-		for {
-			select {
-			case sema <- struct{}{}:
-				wg.Add(1)
-				go func() {
-					defer func() {
-						wg.Done()
-						<-sema
-					}()
-					if rand.Int63n(2) != 0 {
-						ctx = ydb.WithQueryMode(ctx, ydb.ScanQueryMode)
-					}
-					_, _ = readData(ctx, db, path.Join(cc.Name(), prefix), rand.Int63n(25000))
-				}()
-			case <-ctx.Done():
-				break
-			}
-
-		}
-		wg.Wait()
+	err = prepareSchema(ctx, db, prefix)
+	if err != nil {
+		log.Fatalf("create tables error: %v", err)
 	}
-}
 
-func prepareSchema(ctx context.Context, db *sql.DB, prefix string) (err error) {
-	if err = retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) error {
-		_, err := cc.ExecContext(
-			ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
-			fmt.Sprintf("DROP TABLE `%s`", path.Join(prefix, "series")),
-		)
-		if err != nil {
-			fmt.Fprintf(os.Stdout, "warn: drop series table failed: %v", err)
-		}
-		_, err = cc.ExecContext(
-			ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
-			`CREATE TABLE `+"`"+path.Join(prefix, "series")+"`"+` (
-				series_id UTF8,
-				title UTF8,
-				series_info UTF8,
-				release_date Date,
-				comment UTF8,
-				PRIMARY KEY (
-					series_id
-				)
-			) WITH (
-				AUTO_PARTITIONING_BY_LOAD = ENABLED
-			);`,
-		)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "create series table failed: %v", err)
-			return err
-		}
-		return nil
-	}, retry.WithDoRetryOptions(retry.WithIdempotent(true))); err != nil {
-		return err
+	err = fillTablesWithData(ctx, db, prefix)
+	if err != nil {
+		log.Fatalf("fill tables with data error: %v", err)
 	}
-	if err = retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) error {
-		_, err = cc.ExecContext(
-			ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
-			fmt.Sprintf("DROP TABLE `%s`", path.Join(prefix, "seasons")),
-		)
-		if err != nil {
-			fmt.Fprintf(os.Stdout, "warn: drop seasons table failed: %v", err)
-		}
-		_, err = cc.ExecContext(
-			ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
-			`CREATE TABLE `+"`"+path.Join(prefix, "seasons")+"`"+` (
-				series_id UTF8,
-				season_id UTF8,
-				title UTF8,
-				first_aired Date,
-				last_aired Date,
-				PRIMARY KEY (
-					series_id,
-					season_id
-				)
-			) WITH (
-				AUTO_PARTITIONING_BY_LOAD = ENABLED
-			);`,
-		)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "create seasons table failed: %v", err)
-			return err
-		}
-		return nil
-	}, retry.WithDoRetryOptions(retry.WithIdempotent(true))); err != nil {
-		return err
-	}
-	if err = retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) error {
-		_, err = cc.ExecContext(
-			ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
-			fmt.Sprintf("DROP TABLE `%s`", path.Join(prefix, "episodes")),
-		)
-		if err != nil {
-			fmt.Fprintf(os.Stdout, "warn: drop episodes table failed: %v", err)
-		}
-		_, err = cc.ExecContext(
-			ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
-			`CREATE TABLE `+"`"+path.Join(prefix, "episodes")+"`"+` (
-				series_id UTF8,
-				season_id UTF8,
-				episode_id UTF8,
-				title UTF8,
-				air_date Date,
-				views Uint64,
-				PRIMARY KEY (
-					series_id,
-					season_id,
-					episode_id
-				)
-			) WITH (
-				AUTO_PARTITIONING_BY_LOAD = ENABLED
-			);`,
-		)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "create episodes table failed: %v", err)
-			return err
-		}
 
-		return nil
-	}, retry.WithDoRetryOptions(retry.WithIdempotent(true))); err != nil {
-		return err
-	}
-	return nil
-}
-
-func upsertData(ctx context.Context, db *sql.DB, prefix string, concurrency int) (err error) {
-	rowsLen := 25000000000
-	batchSize := 1000
 	wg := sync.WaitGroup{}
-	sema := make(chan struct{}, concurrency)
-	for shift := 0; shift < rowsLen; shift += batchSize {
-		wg.Add(1)
-		sema <- struct{}{}
-		go func(prefix string, shift int) {
-			defer func() {
-				<-sema
-				wg.Done()
-			}()
-			rows := make([]types.Value, 0, batchSize)
-			for i := 0; i < batchSize; i++ {
-				rows = append(rows, types.StructValue(
-					types.StructFieldValue("series_id", types.UTF8Value(uuid.New().String())),
-					types.StructFieldValue("title", types.UTF8Value(fmt.Sprintf("series No. %d title", i+shift+3))),
-					types.StructFieldValue("series_info", types.UTF8Value(fmt.Sprintf("series No. %d info", i+shift+3))),
-					types.StructFieldValue("release_date", types.DateValueFromTime(time.Now())),
-					types.StructFieldValue("comment", types.UTF8Value(fmt.Sprintf("series No. %d comment", i+shift+3))),
-				))
-			}
-			if err = retry.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) error {
-				if _, err := tx.ExecContext(ctx,
-					fmt.Sprintf("UPSERT INTO `%s` SELECT * FROM AS_TABLE($values)", path.Join(prefix, "series")),
-					sql.Named("values", types.ListValue(rows...)),
-				); err != nil {
-					return err
+
+	for i := 0; i < 10; i++ {
+		wg.Add(3)
+		go func() {
+			defer wg.Done()
+			for {
+				err = fillTablesWithData(ctx, db, prefix)
+				if err != nil {
+					log.Fatalf("fill tables with data error: %v", err)
 				}
-				return nil
-			}, retry.WithDoTxRetryOptions(retry.WithIdempotent(true))); err != nil {
-				fmt.Fprintf(os.Stderr, "Upsert failed: %v", err)
 			}
-		}(prefix, shift)
+		}()
+		go func() {
+			defer wg.Done()
+			for {
+				err = selectDefault(ctx, db, prefix)
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			for {
+				err = selectScan(ctx, db, prefix)
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
+		}()
 	}
 	wg.Wait()
-	return nil
-}
-
-func readData(ctx context.Context, db *sql.DB, prefix string, limit int64) (count uint64, err error) {
-	var query = fmt.Sprintf("SELECT series_id, title, release_date FROM `%s` LIMIT %d;",
-		path.Join(prefix, "series"),
-		limit,
-	)
-	if err = retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) error {
-		rows, err := cc.QueryContext(ctx, query)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "scan failed: %v", err)
-			return err
-		}
-		defer rows.Close()
-		var (
-			id    string
-			title *string
-			date  *time.Time
-		)
-		for rows.Next() {
-			count++
-			if err = rows.Scan(&id, &title, &date); err != nil {
-				fmt.Fprintf(os.Stderr, "scan failed: %v", err)
-				return err
-			}
-		}
-		if err = rows.Err(); err != nil {
-			fmt.Fprintf(os.Stderr, "rows err not nil: %v", err)
-			return err
-		}
-		return nil
-	}, retry.WithDoRetryOptions(retry.WithIdempotent(true))); err != nil {
-		fmt.Fprintf(os.Stderr, "scan failed: %v", err)
-		return count, err
-	}
-	return count, nil
 }
