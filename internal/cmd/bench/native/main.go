@@ -128,8 +128,7 @@ func main() {
 }
 
 func upsertData(ctx context.Context, c table.Client, prefix, tableName string, concurrency int) (err error) {
-	err = c.Do(
-		ctx,
+	err = c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			return s.DropTable(ctx, path.Join(prefix, tableName))
 		},
@@ -138,8 +137,7 @@ func upsertData(ctx context.Context, c table.Client, prefix, tableName string, c
 	if err != nil {
 		return err
 	}
-	err = c.Do(
-		ctx,
+	err = c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, tableName),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
@@ -177,8 +175,7 @@ func upsertData(ctx context.Context, c table.Client, prefix, tableName string, c
 					types.StructFieldValue("comment", types.UTF8Value(fmt.Sprintf("series No. %d comment", i+shift+3))),
 				))
 			}
-			_ = c.Do(
-				ctx,
+			_ = c.Do(ctx,
 				func(ctx context.Context, session table.Session) (err error) {
 					return session.BulkUpsert(
 						ctx,
@@ -205,8 +202,7 @@ func scanSelect(ctx context.Context, c table.Client, prefix string, limit int64)
 		prefix,
 		limit,
 	)
-	err = c.Do(
-		ctx,
+	err = c.Do(ctx,
 		func(ctx context.Context, s table.Session) error {
 			var res result.StreamResult
 			count = 0

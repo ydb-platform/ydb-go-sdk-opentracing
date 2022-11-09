@@ -264,31 +264,13 @@ func fillTablesWithData(ctx context.Context, db *sql.DB, prefix string) (err err
 					{{ .Declares }}
 				
 					REPLACE INTO series
-					SELECT
-						series_id,
-						title,
-						series_info,
-						release_date,
-						comment
-					FROM AS_TABLE($seriesData);
+					SELECT * FROM AS_TABLE($seriesData);
 						
 					REPLACE INTO seasons
-					SELECT
-						series_id,
-						season_id,
-						title,
-						first_aired,
-						last_aired
-					FROM AS_TABLE($seasonsData);
+					SELECT * FROM AS_TABLE($seasonsData);
 						
 					REPLACE INTO episodes
-					SELECT
-						series_id,
-						season_id,
-						episode_id,
-						title,
-						air_date
-					FROM AS_TABLE($episodesData);
+					SELECT * FROM AS_TABLE($episodesData);
 				`)), struct {
 					TablePathPrefix string
 					Declares        string
