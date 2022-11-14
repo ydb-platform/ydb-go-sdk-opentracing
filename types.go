@@ -74,7 +74,12 @@ func startSpan(ctx *context.Context, operationName string, fields ...otlog.Field
 	return s
 }
 
-func followSpan(related opentracing.SpanContext, ctx *context.Context, operationName string, fields ...otlog.Field) (s opentracing.Span) {
+func followSpan(
+	related opentracing.SpanContext,
+	ctx *context.Context,
+	operationName string,
+	fields ...otlog.Field,
+) (s opentracing.Span) {
 	if ctx != nil {
 		var childCtx context.Context
 		s, childCtx = opentracing.StartSpanFromContext(*ctx, operationName, opentracing.FollowsFrom(related))
