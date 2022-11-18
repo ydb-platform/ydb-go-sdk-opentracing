@@ -1,6 +1,9 @@
 package tracing
 
 import (
+	"fmt"
+
+	"github.com/opentracing/opentracing-go/ext"
 	otlog "github.com/opentracing/opentracing-go/log"
 	"github.com/ydb-platform/ydb-go-sdk-opentracing/internal/safe"
 	"github.com/ydb-platform/ydb-go-sdk-opentracing/internal/str"
@@ -30,6 +33,10 @@ func Table(details trace.Details) (t trace.Table) {
 				info.Context,
 				"ydb_table_do",
 			)
+			if info.NestedCall {
+				start.SetTag(string(ext.Error), true)
+				start.LogFields(otlog.Error(fmt.Errorf("nested call")))
+			}
 			start.SetBaggageItem("idempotent", str.Bool(info.Idempotent))
 			return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
 				intermediate(start, info.Error)
@@ -46,6 +53,10 @@ func Table(details trace.Details) (t trace.Table) {
 				info.Context,
 				"ydb_table_do_tx",
 			)
+			if info.NestedCall {
+				start.SetTag(string(ext.Error), true)
+				start.LogFields(otlog.Error(fmt.Errorf("nested call")))
+			}
 			start.SetBaggageItem("idempotent", str.Bool(info.Idempotent))
 			return func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
 				intermediate(start, info.Error)
