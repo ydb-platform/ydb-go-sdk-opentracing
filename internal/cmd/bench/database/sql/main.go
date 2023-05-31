@@ -64,7 +64,7 @@ func main() {
 	}
 	defer func() { _ = nativeDriver.Close(ctx) }()
 
-	connector, err := ydb.Connector(nativeDriver)
+	connector, err := ydb.Connector(nativeDriver, ydb.WithTablePathPrefix(path.Join(nativeDriver.Name(), prefix)), ydb.WithAutoDeclare())
 	if err != nil {
 		log.Fatalf("create connector failed: %v", err)
 	}
@@ -92,7 +92,7 @@ func main() {
 		log.Fatalf("create tables error: %v", err)
 	}
 
-	err = fillTablesWithData(ctx, db, prefix)
+	err = fillTablesWithData(ctx, db)
 	if err != nil {
 		log.Fatalf("fill tables with data error: %v", err)
 	}
@@ -104,7 +104,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 			for {
-				err = fillTablesWithData(ctx, db, prefix)
+				err = fillTablesWithData(ctx, db)
 				if err != nil {
 					log.Fatalf("fill tables with data error: %v", err)
 				}
@@ -113,7 +113,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 			for {
-				err = selectDefault(ctx, db, prefix)
+				err = selectDefault(ctx, db)
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -122,7 +122,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 			for {
-				err = selectScan(ctx, db, prefix)
+				err = selectScan(ctx, db)
 				if err != nil {
 					log.Fatal(err)
 				}

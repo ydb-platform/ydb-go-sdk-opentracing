@@ -310,9 +310,6 @@ func Table(details trace.Details) (t trace.Table) {
 				}
 			}
 		}
-		if details&trace.TablePoolSessionLifeCycleEvents != 0 {
-			// nop
-		}
 		if details&trace.TablePoolAPIEvents != 0 {
 			t.OnPoolPut = func(info trace.TablePoolPutStartInfo) func(trace.TablePoolPutDoneInfo) {
 				start := startSpan(

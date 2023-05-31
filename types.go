@@ -2,14 +2,12 @@ package tracing
 
 import (
 	"context"
-	"net/url"
-	"sync/atomic"
-
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	otlog "github.com/opentracing/opentracing-go/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"net/url"
 )
 
 func logError(s opentracing.Span, err error) {
@@ -41,13 +39,6 @@ type counter struct {
 	span    opentracing.Span
 	counter int64
 	name    string
-}
-
-func (s *counter) add(delta int64) {
-	atomic.AddInt64(&s.counter, delta)
-	s.span.LogFields(
-		otlog.Int64(s.name, atomic.LoadInt64(&s.counter)),
-	)
 }
 
 func startSpanWithCounter(ctx *context.Context, operationName string, counterName string, fields ...otlog.Field) (c *counter) {

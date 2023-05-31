@@ -27,13 +27,13 @@ func Driver(details trace.Details) (t trace.Driver) {
 		}
 	}
 	if details&trace.DriverConnEvents != 0 {
-		t.OnConnTake = func(info trace.DriverConnTakeStartInfo) func(trace.DriverConnTakeDoneInfo) {
+		t.OnConnDial = func(info trace.DriverConnDialStartInfo) func(trace.DriverConnDialDoneInfo) {
 			start := startSpan(
 				info.Context,
 				"ydb_conn_take",
 			)
 			start.SetTag("address", safe.Address(info.Endpoint))
-			return func(info trace.DriverConnTakeDoneInfo) {
+			return func(info trace.DriverConnDialDoneInfo) {
 				finish(
 					start,
 					info.Error,
@@ -162,7 +162,7 @@ func Driver(details trace.Details) (t trace.Driver) {
 			start.SetTag("need_local_dc", info.NeedLocalDC)
 			return func(info trace.DriverBalancerUpdateDoneInfo) {
 				start.SetTag("local_dc", info.LocalDC)
-				finish(start, info.Error,
+				finish(start, nil,
 					otlog.Object("endpoints", info.Endpoints),
 				)
 			}
@@ -196,7 +196,7 @@ func Driver(details trace.Details) (t trace.Driver) {
 		}
 	}
 	connectionsTotal := startSpanWithCounter(nil, "ydb_connections", "total")
-	return t.Compose(trace.Driver{
+	return *t.Compose(&trace.Driver{
 		OnInit: func(info trace.DriverInitStartInfo) func(trace.DriverInitDoneInfo) {
 			start := startSpan(
 				info.Context,
@@ -218,17 +218,6 @@ func Driver(details trace.Details) (t trace.Driver) {
 			return func(info trace.DriverCloseDoneInfo) {
 				finish(start, info.Error)
 			}
-		},
-		OnNetDial: func(info trace.DriverNetDialStartInfo) func(trace.DriverNetDialDoneInfo) {
-			return func(info trace.DriverNetDialDoneInfo) {
-				if info.Error == nil {
-					connectionsTotal.add(1)
-				}
-			}
-		},
-		OnNetClose: func(info trace.DriverNetCloseStartInfo) func(trace.DriverNetCloseDoneInfo) {
-			connectionsTotal.add(-1)
-			return nil
 		},
 	})
 }
