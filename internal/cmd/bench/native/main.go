@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -16,6 +17,7 @@ import (
 	"github.com/opentracing/opentracing-go"
 	jaegerConfig "github.com/uber/jaeger-client-go/config"
 
+	env "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -31,19 +33,27 @@ func init() {
 	http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 500
 }
 
-type quet struct {
-}
-
-func (q quet) Write(p []byte) (n int, err error) {
-	return len(p), nil
-}
-
 const (
-	tracerURL   = "localhost:5775"
 	serviceName = "ydb-go-sdk"
 )
 
+func testQuery(ctx context.Context, db *ydb.Driver) error {
+	const query = `SELECT 42 as id, "myStr" as myStr;`
+
+	// Do retry operation on errors with best effort
+	err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err error) {
+		_, _, err = s.Execute(ctx, table.DefaultTxControl(), query, nil)
+		if err != nil {
+			return err
+		}
+		return err
+	})
+	return err
+}
+
 func main() {
+	log.Println("started")
+
 	tracer, closer, err := jaegerConfig.Configuration{
 		ServiceName: serviceName,
 		Sampler: &jaegerConfig.SamplerConfig{
@@ -53,7 +63,7 @@ func main() {
 		Reporter: &jaegerConfig.ReporterConfig{
 			LogSpans:            true,
 			BufferFlushInterval: 1 * time.Second,
-			LocalAgentHostPort:  tracerURL,
+			CollectorEndpoint:   os.Getenv("JAEGER_ENDPOINT"),
 		},
 	}.NewTracer()
 	if err != nil {
@@ -68,19 +78,12 @@ func main() {
 	span, ctx := opentracing.StartSpanFromContext(context.Background(), "client")
 	defer span.Finish()
 
-	var creds ydb.Option
-	if token, has := os.LookupEnv("YDB_ACCESS_TOKEN_CREDENTIALS"); has {
-		creds = ydb.WithAccessTokenCredentials(token)
-	}
-	if v, has := os.LookupEnv("YDB_ANONYMOUS_CREDENTIALS"); has && v == "1" {
-		creds = ydb.WithAnonymousCredentials()
-	}
 	db, err := ydb.Open(
 		ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithDialTimeout(5*time.Second),
 		ydb.WithBalancer(balancers.RandomChoice()),
-		creds,
+		env.WithEnvironCredentials(ctx),
 		ydb.WithSessionPoolSizeLimit(300),
 		ydb.WithSessionPoolIdleThreshold(time.Second*5),
 		tracing.WithTraces(trace.DetailsAll),
@@ -92,42 +95,45 @@ func main() {
 		_ = db.Close(ctx)
 	}()
 
-	log.SetOutput(&quet{})
+	log.Println("connected")
 
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
+	if err := testQuery(ctx, db); err != nil {
+		panic(err)
+	}
+	log.Println("test query done")
 
-	if concurrency, err := strconv.Atoi(os.Getenv("YDB_PREPARE_BENCH_DATA")); err == nil && concurrency > 0 {
-		_ = upsertData(ctx, db.Table(), db.Name(), "series", concurrency)
+	workersCount, err := strconv.Atoi(os.Getenv("WORKERS_COUNT"))
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	concurrency := func() int {
-		if concurrency, err := strconv.Atoi(os.Getenv("CONCURRENCY")); err != nil && concurrency > 0 {
-			return concurrency
+	//TODO: remade to bool
+	if os.Getenv("PREPARE_BENCH_DATA") == "1" {
+		var tableName = "series"
+
+		err = prepareTable(ctx, db.Table(), db.Name(), tableName)
+		if err != nil {
+			log.Fatal(err)
 		}
-		return 300
-	}()
+		log.Println("table prepared")
 
-	wg.Add(concurrency)
+		err = upsertData(ctx, db.Table(), db.Name(), tableName, workersCount)
+		if err != nil {
+			log.Fatal(err)
+		}
 
-	for i := 0; i < concurrency; i++ {
-		go func() {
-			defer wg.Done()
-			for {
-				time.Sleep(time.Duration(rand.Int63n(int64(time.Second))))
-				_, _ = scanSelect(
-					ctx,
-					db.Table(),
-					db.Name(),
-					rand.Int63n(25000),
-				)
-			}
-		}()
+		log.Println("upserted data")
 	}
-	wg.Wait()
+
+	maxLimit, _ := strconv.Atoi(os.Getenv("MAX_LIMIT"))
+	errCh := scanSelect(ctx, db.Table(), db.Name(), rand.Int63n(int64(maxLimit)), workersCount)
+	for err := range errCh {
+		log.Println(err)
+	}
 }
 
-func upsertData(ctx context.Context, c table.Client, prefix, tableName string, concurrency int) (err error) {
+func prepareTable(ctx context.Context, c table.Client, prefix, tableName string) (err error) {
+	log.Println("dropping table", path.Join(prefix, tableName))
 	err = c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			return s.DropTable(ctx, path.Join(prefix, tableName))
@@ -135,8 +141,13 @@ func upsertData(ctx context.Context, c table.Client, prefix, tableName string, c
 		table.WithIdempotent(),
 	)
 	if err != nil {
-		return err
+		// don't return error because operation is not idempotent
+		log.Println("warning: error with dropping table: ", err)
+	} else {
+		log.Println("dropped table", path.Join(prefix, tableName))
 	}
+
+	log.Println("creating table", path.Join(prefix, tableName))
 	err = c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(prefix, tableName),
@@ -148,20 +159,35 @@ func upsertData(ctx context.Context, c table.Client, prefix, tableName string, c
 				options.WithPrimaryKeyColumn("series_id"),
 			)
 		},
-		table.WithIdempotent(),
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("error with creating table: %w", err)
 	}
-	rowsLen := 25000000
-	batchSize := 1000
-	wg := sync.WaitGroup{}
-	sema := make(chan struct{}, concurrency)
+
+	log.Println("created table", path.Join(prefix, tableName))
+	return nil
+}
+
+// TODO: remade to worker pool
+func upsertData(ctx context.Context, c table.Client, prefix, tableName string, workersCount int) (err error) {
+
+	log.Println("upserting rows")
+	rowsLen, _ := strconv.Atoi(os.Getenv("ROWS_LEN"))
+	batchSize, _ := strconv.Atoi(os.Getenv("BATCH_SIZE"))
+
+	var (
+		wg    = sync.WaitGroup{}
+		sema  = make(chan struct{}, workersCount)
+		errCh = make(chan error, workersCount)
+	)
+
 	for shift := 0; shift < rowsLen; shift += batchSize {
 		wg.Add(1)
 		sema <- struct{}{}
 		go func(prefix, tableName string, shift int) {
+			log.Println("upserting with shift", shift)
 			defer func() {
+				log.Println("finished upserting with shift", shift)
 				<-sema
 				wg.Done()
 			}()
@@ -175,7 +201,7 @@ func upsertData(ctx context.Context, c table.Client, prefix, tableName string, c
 					types.StructFieldValue("comment", types.UTF8Value(fmt.Sprintf("series No. %d comment", i+shift+3))),
 				))
 			}
-			_ = c.Do(ctx,
+			err = c.Do(ctx,
 				func(ctx context.Context, session table.Session) (err error) {
 					return session.BulkUpsert(
 						ctx,
@@ -183,15 +209,68 @@ func upsertData(ctx context.Context, c table.Client, prefix, tableName string, c
 						types.ListValue(rows...),
 					)
 				},
-				table.WithIdempotent(),
 			)
+			if err != nil {
+				errCh <- err
+			}
 		}(prefix, tableName, shift)
 	}
 	wg.Wait()
+	close(errCh)
+
+	issues := make([]error, 0, workersCount)
+	for err := range errCh {
+		issues = append(issues, err)
+	}
+	if len(issues) > 0 {
+		log.Println("upserted rows with errors:", issues)
+
+		// in go 1.20 better to replace with errors.Join()
+		err := errors.New("")
+		for _, issue := range issues {
+			err = fmt.Errorf("%w, %w", err, issue)
+		}
+
+		return errors.New("could not upsert rows")
+	}
+
 	return nil
 }
 
-func scanSelect(ctx context.Context, c table.Client, prefix string, limit int64) (count uint64, err error) {
+func scanSelect(ctx context.Context, c table.Client, prefix string, limit int64, workersCount int) <-chan error {
+	var (
+		wg    sync.WaitGroup
+		errCh = make(chan error, workersCount)
+	)
+	wg.Add(workersCount)
+
+	go func() {
+		wg.Wait()
+		close(errCh)
+	}()
+
+	for workerNum := 0; workerNum < workersCount; workerNum++ {
+		go func() {
+			defer wg.Done()
+			for {
+				time.Sleep(time.Duration(rand.Int63n(int64(time.Second))))
+				_, err := scanSelectJob(
+					ctx,
+					c,
+					prefix,
+					limit,
+				)
+				if err != nil {
+					errCh <- err
+				}
+			}
+		}()
+	}
+
+	return errCh
+}
+
+func scanSelectJob(ctx context.Context, c table.Client, prefix string, limit int64) (count uint64, err error) {
 	var query = fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%s");
 		SELECT
