@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/spf13/viper"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
 	_ "net/http/pprof"
-	"os"
 	"path"
-	"strconv"
 	"sync"
 	"time"
 
@@ -33,10 +33,6 @@ func init() {
 	http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 500
 }
 
-const (
-	serviceName = "ydb-go-sdk"
-)
-
 func testQuery(ctx context.Context, db *ydb.Driver) error {
 	const query = `SELECT 42 as id, "myStr" as myStr;`
 
@@ -51,11 +47,9 @@ func testQuery(ctx context.Context, db *ydb.Driver) error {
 	return err
 }
 
-func main() {
-	log.Println("started")
-
+func initTracer(v *viper.Viper) (io.Closer, error) {
 	tracer, closer, err := jaegerConfig.Configuration{
-		ServiceName: serviceName,
+		ServiceName: v.GetString(ServiceName),
 		Sampler: &jaegerConfig.SamplerConfig{
 			Type:  "const",
 			Param: 1,
@@ -63,24 +57,31 @@ func main() {
 		Reporter: &jaegerConfig.ReporterConfig{
 			LogSpans:            true,
 			BufferFlushInterval: 1 * time.Second,
-			CollectorEndpoint:   os.Getenv("JAEGER_ENDPOINT"),
+			CollectorEndpoint:   v.GetString(JaegerEndpoint),
 		},
 	}.NewTracer()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-
-	defer closer.Close()
-
-	// set global tracer of this application
 	opentracing.SetGlobalTracer(tracer)
 
-	span, ctx := opentracing.StartSpanFromContext(context.Background(), "client")
-	defer span.Finish()
+	return closer, nil
+}
+
+func initConnectionToYdb(ctx context.Context, v *viper.Viper) (_ *ydb.Driver, err error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "initialize connection to YDB")
+	defer func() {
+		if err != nil {
+			span.SetTag("error", true)
+		} else {
+			span.SetTag("error", false)
+		}
+		span.Finish()
+	}()
 
 	db, err := ydb.Open(
 		ctx,
-		os.Getenv("YDB_CONNECTION_STRING"),
+		v.GetString(YdbConnectionString),
 		ydb.WithDialTimeout(5*time.Second),
 		ydb.WithBalancer(balancers.RandomChoice()),
 		env.WithEnvironCredentials(ctx),
@@ -89,44 +90,54 @@ func main() {
 		tracing.WithTraces(trace.DetailsAll),
 	)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	defer func() {
 		_ = db.Close(ctx)
 	}()
 
-	log.Println("connected")
-
 	if err := testQuery(ctx, db); err != nil {
-		panic(err)
+		return nil, err
 	}
-	log.Println("test query done")
 
-	workersCount, err := strconv.Atoi(os.Getenv("WORKERS_COUNT"))
+	return db, nil
+}
+
+func main() {
+	v := initViper()
+
+	closer, err := initTracer(v)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		_ = closer.Close()
+	}()
+
+	span, ctx := opentracing.StartSpanFromContext(context.Background(), "client")
+	defer span.Finish()
+
+	db, err := initConnectionToYdb(ctx, v)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	//TODO: remade to bool
-	if os.Getenv("PREPARE_BENCH_DATA") == "1" {
+	if v.GetBool(PrepareBenchData) {
 		var tableName = "series"
 
 		err = prepareTable(ctx, db.Table(), db.Name(), tableName)
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Println("table prepared")
 
-		err = upsertData(ctx, db.Table(), db.Name(), tableName, workersCount)
+		err = upsertData(ctx, v, db.Table(), db.Name(), tableName)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		log.Println("upserted data")
 	}
 
-	maxLimit, _ := strconv.Atoi(os.Getenv("MAX_LIMIT"))
-	errCh := scanSelect(ctx, db.Table(), db.Name(), rand.Int63n(int64(maxLimit)), workersCount)
+	errCh := scanSelect(ctx, v, db.Table(), db.Name())
 	for err := range errCh {
 		log.Println(err)
 	}
@@ -134,6 +145,17 @@ func main() {
 
 func prepareTable(ctx context.Context, c table.Client, prefix, tableName string) (err error) {
 	log.Println("dropping table", path.Join(prefix, tableName))
+
+	span, ctx := opentracing.StartSpanFromContext(ctx, "prepare table")
+	defer func() {
+		if err != nil {
+			span.SetTag("error", true)
+		} else {
+			span.SetTag("error", false)
+		}
+		span.Finish()
+	}()
+
 	err = c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			return s.DropTable(ctx, path.Join(prefix, tableName))
@@ -168,20 +190,14 @@ func prepareTable(ctx context.Context, c table.Client, prefix, tableName string)
 	return nil
 }
 
-// TODO: remade to worker pool
-func upsertData(ctx context.Context, c table.Client, prefix, tableName string, workersCount int) (err error) {
-
-	log.Println("upserting rows")
-	rowsLen, _ := strconv.Atoi(os.Getenv("ROWS_LEN"))
-	batchSize, _ := strconv.Atoi(os.Getenv("BATCH_SIZE"))
-
+func upsertData(ctx context.Context, v *viper.Viper, c table.Client, prefix, tableName string) (err error) {
 	var (
 		wg    = sync.WaitGroup{}
-		sema  = make(chan struct{}, workersCount)
-		errCh = make(chan error, workersCount)
+		sema  = make(chan struct{}, v.GetInt(WorkersCount))
+		errCh = make(chan error, v.GetInt(WorkersCount))
 	)
 
-	for shift := 0; shift < rowsLen; shift += batchSize {
+	for shift := 0; shift < v.GetInt(RowsLen); shift += v.GetInt(BatchSize) {
 		wg.Add(1)
 		sema <- struct{}{}
 		go func(prefix, tableName string, shift int) {
@@ -191,8 +207,8 @@ func upsertData(ctx context.Context, c table.Client, prefix, tableName string, w
 				<-sema
 				wg.Done()
 			}()
-			rows := make([]types.Value, 0, batchSize)
-			for i := 0; i < batchSize; i++ {
+			rows := make([]types.Value, 0, v.GetInt(BatchSize))
+			for i := 0; i < v.GetInt(BatchSize); i++ {
 				rows = append(rows, types.StructValue(
 					types.StructFieldValue("series_id", types.Uint64Value(uint64(i+shift+3))),
 					types.StructFieldValue("title", types.UTF8Value(fmt.Sprintf("series No. %d title", i+shift+3))),
@@ -218,7 +234,7 @@ func upsertData(ctx context.Context, c table.Client, prefix, tableName string, w
 	wg.Wait()
 	close(errCh)
 
-	issues := make([]error, 0, workersCount)
+	issues := make([]error, 0, v.GetInt(WorkersCount))
 	for err := range errCh {
 		issues = append(issues, err)
 	}
@@ -231,25 +247,25 @@ func upsertData(ctx context.Context, c table.Client, prefix, tableName string, w
 			err = fmt.Errorf("%w, %w", err, issue)
 		}
 
-		return errors.New("could not upsert rows")
+		return fmt.Errorf("could not upsert rows: %w", err)
 	}
 
 	return nil
 }
 
-func scanSelect(ctx context.Context, c table.Client, prefix string, limit int64, workersCount int) <-chan error {
+func scanSelect(ctx context.Context, v *viper.Viper, c table.Client, prefix string) <-chan error {
 	var (
 		wg    sync.WaitGroup
-		errCh = make(chan error, workersCount)
+		errCh = make(chan error, v.GetInt(WorkersCount))
 	)
-	wg.Add(workersCount)
+	wg.Add(v.GetInt(WorkersCount))
 
 	go func() {
 		wg.Wait()
 		close(errCh)
 	}()
 
-	for workerNum := 0; workerNum < workersCount; workerNum++ {
+	for workerNum := 0; workerNum < v.GetInt(WorkersCount); workerNum++ {
 		go func() {
 			defer wg.Done()
 			for {
@@ -258,7 +274,7 @@ func scanSelect(ctx context.Context, c table.Client, prefix string, limit int64,
 					ctx,
 					c,
 					prefix,
-					limit,
+					rand.Int63n(v.GetInt64(MaxLimit)),
 				)
 				if err != nil {
 					errCh <- err
