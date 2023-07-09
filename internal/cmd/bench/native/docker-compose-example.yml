@@ -1,0 +1,33 @@
+version: '3'
+services:
+
+  ydb-local:
+    image: cr.yandex/yc/yandex-docker-local-ydb:latest
+    volumes:
+      - ./ydb_certs:/ydb_certs
+      - ./ydb_data:/ydb_data
+    ports:
+      - 8765:8765 # monitoring
+    environment:
+      GRPC_TLS_PORT: 2135
+      GRPC_PORT: 2136
+      MON_PORT: 8765
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - 16686:16686 # frontend
+
+  ydb-jaeger-bench-app:
+    image: ydb-jaeger-bench-app
+    environment:
+      SERVICE_NAME: "ydb-go-sdk"
+      PREPARE_BENCH_DATA: true
+      WORKERS_COUNT: 1
+      ROWS_LEN: 50
+      BATCH_SIZE: 10
+      MAX_LIMIT: 20
+      JAEGER_ENDPOINT: "http://jaeger:14268/api/traces"
+
+      YDB_ANONYMOUS_CREDENTIALS: 1
+      YDB_CONNECTION_STRING: grpc://ydb-local:2136/local

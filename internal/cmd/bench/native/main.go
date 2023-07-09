@@ -4,7 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/opentracing/opentracing-go"
 	"github.com/spf13/viper"
+	jaegerConfig "github.com/uber/jaeger-client-go/config"
+	env "github.com/ydb-platform/ydb-go-sdk-auth-environ"
+	tracing "github.com/ydb-platform/ydb-go-sdk-opentracing"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"io"
 	"log"
 	"math/rand"
@@ -13,38 +24,25 @@ import (
 	"path"
 	"sync"
 	"time"
-
-	"github.com/opentracing/opentracing-go"
-	jaegerConfig "github.com/uber/jaeger-client-go/config"
-
-	env "github.com/ydb-platform/ydb-go-sdk-auth-environ"
-	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-
-	tracing "github.com/ydb-platform/ydb-go-sdk-opentracing"
 )
 
 func init() {
 	http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 500
+	viper.AutomaticEnv()
 }
 
 func testQuery(ctx context.Context, db *ydb.Driver) error {
 	const query = `SELECT 42 as id, "myStr" as myStr;`
 
-	// Do retry operation on errors with best effort
 	err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err error) {
 		_, _, err = s.Execute(ctx, table.DefaultTxControl(), query, nil)
-		if err != nil {
-			return err
-		}
 		return err
 	})
-	return err
+	if err != nil {
+		return fmt.Errorf("testQuery: %w", err)
+	}
+
+	return nil
 }
 
 func initTracer(v *viper.Viper) (io.Closer, error) {
@@ -68,7 +66,7 @@ func initTracer(v *viper.Viper) (io.Closer, error) {
 	return closer, nil
 }
 
-func initConnectionToYdb(ctx context.Context, v *viper.Viper) (_ *ydb.Driver, err error) {
+func initConnectionToYdb(ctx context.Context, v *viper.Viper) (_ *ydb.Driver, closer io.Closer, err error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "initialize connection to YDB")
 	defer func() {
 		if err != nil {
@@ -90,22 +88,21 @@ func initConnectionToYdb(ctx context.Context, v *viper.Viper) (_ *ydb.Driver, er
 		tracing.WithTraces(trace.DetailsAll),
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	defer func() {
-		_ = db.Close(ctx)
-	}()
+	log.Println("connected to ydb")
 
-	if err := testQuery(ctx, db); err != nil {
-		return nil, err
+	err = testQuery(ctx, db)
+	if err != nil {
+		return nil, nil, err
 	}
+	log.Println("test query done")
 
-	return db, nil
+	return db, closer, nil
 }
 
 func main() {
 	v := initViper()
-
 	closer, err := initTracer(v)
 	if err != nil {
 		log.Fatal(err)
@@ -117,10 +114,13 @@ func main() {
 	span, ctx := opentracing.StartSpanFromContext(context.Background(), "client")
 	defer span.Finish()
 
-	db, err := initConnectionToYdb(ctx, v)
+	db, closer, err := initConnectionToYdb(ctx, v)
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer func() {
+		_ = closer.Close()
+	}()
 
 	if v.GetBool(PrepareBenchData) {
 		var tableName = "series"
@@ -183,14 +183,23 @@ func prepareTable(ctx context.Context, c table.Client, prefix, tableName string)
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("error with creating table: %w", err)
+		return fmt.Errorf("create table: %w", err)
 	}
-
 	log.Println("created table", path.Join(prefix, tableName))
 	return nil
 }
 
 func upsertData(ctx context.Context, v *viper.Viper, c table.Client, prefix, tableName string) (err error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "upsert data")
+	defer func() {
+		if err != nil {
+			span.SetTag("error", true)
+		} else {
+			span.SetTag("error", false)
+		}
+		span.Finish()
+	}()
+
 	var (
 		wg    = sync.WaitGroup{}
 		sema  = make(chan struct{}, v.GetInt(WorkersCount))
@@ -254,6 +263,9 @@ func upsertData(ctx context.Context, v *viper.Viper, c table.Client, prefix, tab
 }
 
 func scanSelect(ctx context.Context, v *viper.Viper, c table.Client, prefix string) <-chan error {
+	//span, ctx := opentracing.StartSpanFromContext(ctx, "scan select")
+	//defer span.Finish()
+
 	var (
 		wg    sync.WaitGroup
 		errCh = make(chan error, v.GetInt(WorkersCount))
@@ -287,6 +299,16 @@ func scanSelect(ctx context.Context, v *viper.Viper, c table.Client, prefix stri
 }
 
 func scanSelectJob(ctx context.Context, c table.Client, prefix string, limit int64) (count uint64, err error) {
+	//span, ctx := opentracing.StartSpanFromContext(ctx, "scan select job")
+	//defer func() {
+	//	if err != nil {
+	//		span.SetTag("error", true)
+	//	} else {
+	//		span.SetTag("error", false)
+	//	}
+	//	span.Finish()
+	//}()
+
 	var query = fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%s");
 		SELECT
