@@ -299,15 +299,15 @@ func scanSelect(ctx context.Context, v *viper.Viper, c table.Client, prefix stri
 }
 
 func scanSelectJob(ctx context.Context, c table.Client, prefix string, limit int64) (count uint64, err error) {
-	//span, ctx := opentracing.StartSpanFromContext(ctx, "scan select job")
-	//defer func() {
-	//	if err != nil {
-	//		span.SetTag("error", true)
-	//	} else {
-	//		span.SetTag("error", false)
-	//	}
-	//	span.Finish()
-	//}()
+	span, ctx := opentracing.StartSpanFromContext(ctx, "scan select job")
+	defer func() {
+		if err != nil {
+			span.SetTag("error", true)
+		} else {
+			span.SetTag("error", false)
+		}
+		span.Finish()
+	}()
 
 	var query = fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%s");
