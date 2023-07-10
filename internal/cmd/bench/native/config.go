@@ -13,7 +13,7 @@ const (
 	YdbConnectionString = "YDB_CONNECTION_STRING"
 )
 
-func initViper() *viper.Viper {
+func NewConfigByViper() *viper.Viper {
 	v := viper.GetViper()
 	v.SetDefault(ServiceName, "ydb-go-sdk")
 	v.SetDefault(PrepareBenchData, true)

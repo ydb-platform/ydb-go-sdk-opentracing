@@ -45,7 +45,7 @@ func testQuery(ctx context.Context, db *ydb.Driver) error {
 	return nil
 }
 
-func initTracer(v *viper.Viper) (io.Closer, error) {
+func newTracer(v *viper.Viper) (io.Closer, error) {
 	tracer, closer, err := jaegerConfig.Configuration{
 		ServiceName: v.GetString(ServiceName),
 		Sampler: &jaegerConfig.SamplerConfig{
@@ -59,14 +59,14 @@ func initTracer(v *viper.Viper) (io.Closer, error) {
 		},
 	}.NewTracer()
 	if err != nil {
-		return nil, fmt.Errorf("initTracer: %w", err)
+		return nil, fmt.Errorf("newTracer: %w", err)
 	}
 	opentracing.SetGlobalTracer(tracer)
 
 	return closer, nil
 }
 
-func initConnectionToYDB(ctx context.Context, v *viper.Viper) (_ *ydb.Driver, closer io.Closer, err error) {
+func newYDBConnection(ctx context.Context, v *viper.Viper) (_ *ydb.Driver, closer io.Closer, err error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "initialize connection to YDB")
 	defer func() {
 		if err != nil {
@@ -88,13 +88,13 @@ func initConnectionToYDB(ctx context.Context, v *viper.Viper) (_ *ydb.Driver, cl
 		tracing.WithTraces(trace.DetailsAll),
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("initConnectionToYDB: %w", err)
+		return nil, nil, fmt.Errorf("newYDBConnection: %w", err)
 	}
 	log.Println("connected to YDB")
 
 	err = testQuery(ctx, db)
 	if err != nil {
-		return nil, nil, fmt.Errorf("initConnectionToYDB: %w", err)
+		return nil, nil, fmt.Errorf("newYDBConnection: %w", err)
 	}
 	log.Println("test query done")
 
@@ -102,8 +102,8 @@ func initConnectionToYDB(ctx context.Context, v *viper.Viper) (_ *ydb.Driver, cl
 }
 
 func main() {
-	v := initViper()
-	closer, err := initTracer(v)
+	v := NewConfigByViper()
+	closer, err := newTracer(v)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func main() {
 	span, ctx := opentracing.StartSpanFromContext(context.Background(), "client")
 	defer span.Finish()
 
-	db, closer, err := initConnectionToYDB(ctx, v)
+	db, closer, err := newYDBConnection(ctx, v)
 	if err != nil {
 		log.Fatal(err)
 	}

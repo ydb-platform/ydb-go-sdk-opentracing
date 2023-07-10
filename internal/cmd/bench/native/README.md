@@ -10,7 +10,7 @@ Benchmark for load testing YDB with tracing.
       ```
   - Copy docker-compose file
     ```shell
-    cp ./internal/cmd/bench/native/docker-compose-example.yml ./docker-compose.yml
+    cp ./internal/cmd/bench/native/docker-compose.yml ./docker-compose.yml
     ```
   - Run benchmark
     ```shell
