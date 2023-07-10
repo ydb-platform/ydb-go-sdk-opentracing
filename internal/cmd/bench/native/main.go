@@ -36,7 +36,7 @@ func testQuery(ctx context.Context, db *ydb.Driver) error {
 
 	err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err error) {
 		_, _, err = s.Execute(ctx, table.DefaultTxControl(), query, nil)
-		return err
+		return fmt.Errorf("testQuery: %w", err)
 	})
 	if err != nil {
 		return fmt.Errorf("testQuery: %w", err)
@@ -59,14 +59,14 @@ func initTracer(v *viper.Viper) (io.Closer, error) {
 		},
 	}.NewTracer()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("initTracer: %w", err)
 	}
 	opentracing.SetGlobalTracer(tracer)
 
 	return closer, nil
 }
 
-func initConnectionToYdb(ctx context.Context, v *viper.Viper) (_ *ydb.Driver, closer io.Closer, err error) {
+func initConnectionToYDB(ctx context.Context, v *viper.Viper) (_ *ydb.Driver, closer io.Closer, err error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "initialize connection to YDB")
 	defer func() {
 		if err != nil {
@@ -88,13 +88,13 @@ func initConnectionToYdb(ctx context.Context, v *viper.Viper) (_ *ydb.Driver, cl
 		tracing.WithTraces(trace.DetailsAll),
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("initConnectionToYDB: %w", err)
 	}
-	log.Println("connected to ydb")
+	log.Println("connected to YDB")
 
 	err = testQuery(ctx, db)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("initConnectionToYDB: %w", err)
 	}
 	log.Println("test query done")
 
@@ -114,7 +114,7 @@ func main() {
 	span, ctx := opentracing.StartSpanFromContext(context.Background(), "client")
 	defer span.Finish()
 
-	db, closer, err := initConnectionToYdb(ctx, v)
+	db, closer, err := initConnectionToYDB(ctx, v)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -263,8 +263,8 @@ func upsertData(ctx context.Context, v *viper.Viper, c table.Client, prefix, tab
 }
 
 func scanSelect(ctx context.Context, v *viper.Viper, c table.Client, prefix string) <-chan error {
-	//span, ctx := opentracing.StartSpanFromContext(ctx, "scan select")
-	//defer span.Finish()
+	span, ctx := opentracing.StartSpanFromContext(ctx, "scan select")
+	defer span.Finish()
 
 	var (
 		wg    sync.WaitGroup
@@ -299,15 +299,15 @@ func scanSelect(ctx context.Context, v *viper.Viper, c table.Client, prefix stri
 }
 
 func scanSelectJob(ctx context.Context, c table.Client, prefix string, limit int64) (count uint64, err error) {
-	//span, ctx := opentracing.StartSpanFromContext(ctx, "scan select job")
-	//defer func() {
-	//	if err != nil {
-	//		span.SetTag("error", true)
-	//	} else {
-	//		span.SetTag("error", false)
-	//	}
-	//	span.Finish()
-	//}()
+	span, ctx := opentracing.StartSpanFromContext(ctx, "scan select job")
+	defer func() {
+		if err != nil {
+			span.SetTag("error", true)
+		} else {
+			span.SetTag("error", false)
+		}
+		span.Finish()
+	}()
 
 	var query = fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%s");
