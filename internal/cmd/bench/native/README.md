@@ -6,7 +6,7 @@ Benchmark for load testing YDB with tracing.
 - Docker
   - Build image
       ```shell
-      docker build -t bench . 
+      docker build -t bench -f ./internal/cmd/bench/native/Dockerfile . 
       ```
   - Copy docker-compose file
     ```shell
@@ -17,7 +17,7 @@ Benchmark for load testing YDB with tracing.
     docker-compose up
     ```
 - Binary
-  - Build app
+  - Build
     ```shell
     go build -o ./bench ./internal/cmd/bench/native/...
     ```
