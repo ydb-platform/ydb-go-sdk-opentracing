@@ -3,10 +3,10 @@
 Benchmark for load testing YDB with tracing.
 
 ### Installation
-- Docker
+- Docker (recommended)
   - Build image
       ```shell
-      docker build -t bench -f ./internal/cmd/bench/native/Dockerfile . 
+      docker build -t bench-native . 
       ```
   - Copy docker-compose file
     ```shell
@@ -19,11 +19,11 @@ Benchmark for load testing YDB with tracing.
 - Binary
   - Build
     ```shell
-    go build -o ./bench ./internal/cmd/bench/native/...
+    go build -o ./bench-native ./cmd/native/...
     ```
   - Run benchmark
     ```shell
-    ./bench
+    ./native-bench
     ```
 
 ### Environment variables

@@ -4,6 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"log"
+	"math/rand"
+	"net/http"
+	_ "net/http/pprof"
+	"path"
+	"sync"
+	"time"
+
 	"github.com/opentracing/opentracing-go"
 	"github.com/spf13/viper"
 	jaegerConfig "github.com/uber/jaeger-client-go/config"
@@ -16,33 +25,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-	"io"
-	"log"
-	"math/rand"
-	"net/http"
-	_ "net/http/pprof"
-	"path"
-	"sync"
-	"time"
 )
 
 func init() {
 	http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 500
 	viper.AutomaticEnv()
-}
-
-func testQuery(ctx context.Context, db *ydb.Driver) error {
-	const query = `SELECT 42 as id, "myStr" as myStr;`
-
-	// Do retry operation on errors with best effort
-	err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err error) {
-		_, _, err = s.Execute(ctx, table.DefaultTxControl(), query, nil)
-		return err
-	})
-	if err != nil {
-		return fmt.Errorf("testQuery: %w", err)
-	}
-	return nil
 }
 
 func newTracer(v *viper.Viper) (io.Closer, error) {
@@ -83,7 +70,6 @@ func newYDBConnection(ctx context.Context, v *viper.Viper) (_ *ydb.Driver, close
 
 	if caFile := v.GetString(YdbCAFile); caFile != "" {
 		withCAFileOption = ydb.WithCertificatesFromFile(caFile)
-		log.Println("got cert path")
 	}
 
 	db, err := ydb.Open(
@@ -102,17 +88,20 @@ func newYDBConnection(ctx context.Context, v *viper.Viper) (_ *ydb.Driver, close
 	}
 	log.Println("connected to YDB")
 
-	err = testQuery(ctx, db)
+	err = db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
+		return s.KeepAlive(ctx)
+	})
+
 	if err != nil {
 		return nil, nil, fmt.Errorf("newYDBConnection: %w", err)
 	}
-	log.Println("test query done")
+	log.Println("db ping done")
 
 	return db, closer, nil
 }
 
 func main() {
-	v := NewConfigByViper()
+	v := newConfigByViper()
 	closer, err := newTracer(v)
 	if err != nil {
 		log.Fatal(err)
@@ -133,7 +122,7 @@ func main() {
 	}()
 
 	if v.GetBool(PrepareBenchData) {
-		var tableName = "series"
+		tableName := "series"
 
 		err = prepareTable(ctx, db.Table(), db.Name(), tableName)
 		if err != nil {
@@ -319,7 +308,7 @@ func scanSelectJob(ctx context.Context, c table.Client, prefix string, limit int
 		span.Finish()
 	}()
 
-	var query = fmt.Sprintf(`
+	query := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%s");
 		SELECT
 			series_id,

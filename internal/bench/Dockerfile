@@ -11,6 +11,6 @@ RUN go mod download && go mod verify
 
 COPY . .
 
-RUN go build -o /usr/local/bin/app ./internal/cmd/bench/native/...
+RUN go build -o /usr/local/bin/app ./cmd/native/...
 
 CMD ["app"]

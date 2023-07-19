@@ -18,8 +18,8 @@ services:
     ports:
       - 16686:16686 # frontend
 
-  bench:
-    image: bench
+  bench-native:
+    image: bench-native
     environment:
       SERVICE_NAME: "ydb-go-sdk"
       PREPARE_BENCH_DATA: true

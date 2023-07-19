@@ -14,7 +14,7 @@ const (
 	YdbCAFile           = "YDB_CA_FILE"
 )
 
-func NewConfigByViper() *viper.Viper {
+func newConfigByViper() *viper.Viper {
 	v := viper.GetViper()
 	v.SetDefault(ServiceName, "ydb-go-sdk")
 	v.SetDefault(PrepareBenchData, true)
