@@ -34,14 +34,14 @@ func init() {
 func testQuery(ctx context.Context, db *ydb.Driver) error {
 	const query = `SELECT 42 as id, "myStr" as myStr;`
 
+	// Do retry operation on errors with best effort
 	err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err error) {
 		_, _, err = s.Execute(ctx, table.DefaultTxControl(), query, nil)
-		return fmt.Errorf("testQuery: %w", err)
+		return err
 	})
 	if err != nil {
 		return fmt.Errorf("testQuery: %w", err)
 	}
-
 	return nil
 }
 
@@ -77,6 +77,15 @@ func newYDBConnection(ctx context.Context, v *viper.Viper) (_ *ydb.Driver, close
 		span.Finish()
 	}()
 
+	var withCAFileOption ydb.Option = func(ctx context.Context, c *ydb.Driver) error {
+		return nil
+	}
+
+	if caFile := v.GetString(YdbCAFile); caFile != "" {
+		withCAFileOption = ydb.WithCertificatesFromFile(caFile)
+		log.Println("got cert path")
+	}
+
 	db, err := ydb.Open(
 		ctx,
 		v.GetString(YdbConnectionString),
@@ -86,6 +95,7 @@ func newYDBConnection(ctx context.Context, v *viper.Viper) (_ *ydb.Driver, close
 		ydb.WithSessionPoolSizeLimit(300),
 		ydb.WithSessionPoolIdleThreshold(time.Second*5),
 		tracing.WithTraces(trace.DetailsAll),
+		withCAFileOption,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("newYDBConnection: %w", err)

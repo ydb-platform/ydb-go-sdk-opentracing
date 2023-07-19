@@ -11,6 +11,7 @@ const (
 	MaxLimit            = "MAX_LIMIT"
 	JaegerEndpoint      = "JAEGER_ENDPOINT"
 	YdbConnectionString = "YDB_CONNECTION_STRING"
+	YdbCAFile           = "YDB_CA_FILE"
 )
 
 func NewConfigByViper() *viper.Viper {

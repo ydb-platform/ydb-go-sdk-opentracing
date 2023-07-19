@@ -37,6 +37,7 @@ Benchmark for load testing YDB with tracing.
 | `MAX_LIMIT`             | `int`    | 20         | max scan limit                                                            |
 | `JAEGER_ENDPOINT`       | `string` |            | endpoint to jaeger-collector                                              |
 | `YDB_CONNECTION_STRING` | `string` |            | connection string to YDB in format `grpc(s)://host:port/path/to/db`       |
+| `YDB_CA_FILE`           | `string` |            | path to certificate file to secure connect to YDB                         |
 
 ### YDB auth environment variables
 

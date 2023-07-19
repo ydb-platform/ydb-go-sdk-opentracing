@@ -18,8 +18,8 @@ services:
     ports:
       - 16686:16686 # frontend
 
-  ydb-jaeger-bench-app:
-    image: ydb-jaeger-bench-app
+  bench:
+    image: bench
     environment:
       SERVICE_NAME: "ydb-go-sdk"
       PREPARE_BENCH_DATA: true
