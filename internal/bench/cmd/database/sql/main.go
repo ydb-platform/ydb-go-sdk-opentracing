@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"database/sql"
+	"github.com/opentracing/opentracing-go"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"log"
 	"net/http"
@@ -11,11 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/opentracing/opentracing-go"
 	jaegerConfig "github.com/uber/jaeger-client-go/config"
 
 	ydbTracing "github.com/ydb-platform/ydb-go-sdk-opentracing"
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 )
 
