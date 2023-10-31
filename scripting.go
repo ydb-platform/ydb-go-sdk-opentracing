@@ -42,14 +42,23 @@ func Scripting(details trace.Details) (t trace.Scripting) {
 				otlog.String("query", info.Query),
 				otlog.String("params", safe.Stringer(info.Parameters)),
 			)
+			start.Finish()
 			return func(
 				info trace.ScriptingStreamExecuteIntermediateInfo,
 			) func(
 				trace.ScriptingStreamExecuteDoneInfo,
 			) {
-				intermediate(start, info.Error)
+				s := followSpan(start.Context(), "ydb_scripting_stream_execute_recv")
+				if info.Error != nil {
+					logError(s, info.Error)
+				}
+				s.Finish()
 				return func(info trace.ScriptingStreamExecuteDoneInfo) {
-					finish(start, info.Error)
+					s := followSpan(start.Context(), "ydb_scripting_stream_execute_done")
+					if info.Error != nil {
+						logError(s, info.Error)
+					}
+					s.Finish()
 				}
 			}
 		}

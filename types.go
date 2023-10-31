@@ -28,13 +28,6 @@ func finish(s opentracing.Span, err error, fields ...otlog.Field) {
 	s.Finish()
 }
 
-func intermediate(s opentracing.Span, err error, fields ...otlog.Field) {
-	if err != nil {
-		logError(s, err)
-	}
-	s.LogFields(fields...)
-}
-
 type counter struct {
 	span    opentracing.Span
 	counter int64
@@ -67,17 +60,10 @@ func startSpan(ctx *context.Context, operationName string, fields ...otlog.Field
 
 func followSpan(
 	related opentracing.SpanContext,
-	ctx *context.Context,
 	operationName string,
 	fields ...otlog.Field,
 ) (s opentracing.Span) {
-	if ctx != nil {
-		var childCtx context.Context
-		s, childCtx = opentracing.StartSpanFromContext(*ctx, operationName, opentracing.FollowsFrom(related))
-		*ctx = childCtx
-	} else {
-		s = opentracing.StartSpan(operationName)
-	}
+	s = opentracing.StartSpan(operationName, opentracing.FollowsFrom(related))
 	s.SetTag("ydb-go-sdk", "v"+ydb.Version)
 	s.LogFields(fields...)
 	return s

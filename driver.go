@@ -64,14 +64,21 @@ func Driver(details trace.Details) (t trace.Driver) {
 			)
 			start.SetTag("address", safe.Address(info.Endpoint))
 			start.SetTag("method", string(info.Method))
+			start.Finish()
 			return func(info trace.DriverConnNewStreamRecvInfo) func(trace.DriverConnNewStreamDoneInfo) {
-				intermediate(start, info.Error)
+				s := followSpan(start.Context(), "ydb_conn_stream_recv")
+				if info.Error != nil {
+					logError(s, info.Error)
+				}
+				s.Finish()
 				return func(info trace.DriverConnNewStreamDoneInfo) {
-					finish(
-						start,
-						info.Error,
+					s := followSpan(start.Context(), "ydb_conn_stream_end",
 						otlog.String("state", safe.Stringer(info.State)),
 					)
+					if info.Error != nil {
+						logError(s, info.Error)
+					}
+					s.Finish()
 				}
 			}
 		}

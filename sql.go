@@ -104,7 +104,9 @@ func DatabaseSQL(details trace.Details) (t trace.DatabaseSQL) {
 				prefix+"_begin",
 			)
 			return func(info trace.DatabaseSQLConnBeginDoneInfo) {
-				start.SetTag("transaction_id", safe.ID(info.Tx))
+				if info.Error == nil {
+					start.SetTag("transaction_id", safe.ID(info.Tx))
+				}
 				finish(
 					start,
 					info.Error,
@@ -140,7 +142,6 @@ func DatabaseSQL(details trace.Details) (t trace.DatabaseSQL) {
 		t.OnTxExec = func(info trace.DatabaseSQLTxExecStartInfo) func(trace.DatabaseSQLTxExecDoneInfo) {
 			start := followSpan(
 				opentracing.SpanFromContext(info.TxContext).Context(),
-				info.Context,
 				prefix+"_exec",
 				otlog.String("query", info.Query),
 			)
@@ -156,7 +157,6 @@ func DatabaseSQL(details trace.Details) (t trace.DatabaseSQL) {
 		t.OnTxQuery = func(info trace.DatabaseSQLTxQueryStartInfo) func(trace.DatabaseSQLTxQueryDoneInfo) {
 			start := followSpan(
 				opentracing.SpanFromContext(info.TxContext).Context(),
-				info.Context,
 				prefix+"_query",
 				otlog.String("query", info.Query),
 			)

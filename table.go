@@ -19,12 +19,20 @@ func Table(details trace.Details) (t trace.Table) {
 				"ydb_table_create_session",
 			)
 			return func(info trace.TableCreateSessionIntermediateInfo) func(trace.TableCreateSessionDoneInfo) {
-				intermediate(start, info.Error)
+				s := followSpan(start.Context(), "ydb_table_create_session_intermediate")
+				if info.Error != nil {
+					logError(s, info.Error)
+				}
+				s.Finish()
 				return func(info trace.TableCreateSessionDoneInfo) {
-					finish(start,
-						info.Error,
+					s := followSpan(start.Context(), "ydb_table_create_session_done",
 						otlog.Int("attempts", info.Attempts),
+						otlog.String("session_id", safe.ID(info.Session)),
 					)
+					if info.Error != nil {
+						logError(s, info.Error)
+					}
+					s.Finish()
 				}
 			}
 		}
@@ -38,13 +46,21 @@ func Table(details trace.Details) (t trace.Table) {
 				start.LogFields(otlog.Error(fmt.Errorf("nested call")))
 			}
 			start.SetBaggageItem("idempotent", str.Bool(info.Idempotent))
+			start.Finish()
 			return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
-				intermediate(start, info.Error)
+				s := followSpan(start.Context(), "ydb_table_do_intermediate")
+				if info.Error != nil {
+					logError(s, info.Error)
+				}
+				s.Finish()
 				return func(info trace.TableDoDoneInfo) {
-					finish(start,
-						info.Error,
+					s := followSpan(start.Context(), "ydb_table_do_done",
 						otlog.Int("attempts", info.Attempts),
 					)
+					if info.Error != nil {
+						logError(s, info.Error)
+					}
+					s.Finish()
 				}
 			}
 		}
@@ -58,13 +74,21 @@ func Table(details trace.Details) (t trace.Table) {
 				start.LogFields(otlog.Error(fmt.Errorf("nested call")))
 			}
 			start.SetBaggageItem("idempotent", str.Bool(info.Idempotent))
+			start.Finish()
 			return func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
-				intermediate(start, info.Error)
+				s := followSpan(start.Context(), "ydb_table_do_tx_intermediate")
+				if info.Error != nil {
+					logError(s, info.Error)
+				}
+				s.Finish()
 				return func(info trace.TableDoTxDoneInfo) {
-					finish(start,
-						info.Error,
+					s := followSpan(start.Context(), "ydb_table_do_tx_done",
 						otlog.Int("attempts", info.Attempts),
 					)
+					if info.Error != nil {
+						logError(s, info.Error)
+					}
+					s.Finish()
 				}
 			}
 		}
@@ -178,14 +202,23 @@ func Table(details trace.Details) (t trace.Table) {
 					)
 					start.SetTag("nodeID", nodeID(safe.ID(info.Session)))
 					start.SetTag("session_id", safe.ID(info.Session))
+					start.Finish()
 					return func(
 						info trace.TableSessionQueryStreamExecuteIntermediateInfo,
 					) func(
 						trace.TableSessionQueryStreamExecuteDoneInfo,
 					) {
-						intermediate(start, info.Error)
+						s := followSpan(start.Context(), "ydb_table_session_query_stream_execute_intermediate")
+						if info.Error != nil {
+							logError(s, info.Error)
+						}
+						s.Finish()
 						return func(info trace.TableSessionQueryStreamExecuteDoneInfo) {
-							finish(start, info.Error)
+							s := followSpan(start.Context(), "ydb_table_session_query_stream_execute_done")
+							if info.Error != nil {
+								logError(s, info.Error)
+							}
+							s.Finish()
 						}
 					}
 				}
@@ -202,14 +235,23 @@ func Table(details trace.Details) (t trace.Table) {
 					)
 					start.SetTag("nodeID", nodeID(safe.ID(info.Session)))
 					start.SetTag("session_id", safe.ID(info.Session))
+					start.Finish()
 					return func(
 						info trace.TableSessionQueryStreamReadIntermediateInfo,
 					) func(
 						trace.TableSessionQueryStreamReadDoneInfo,
 					) {
-						intermediate(start, info.Error)
+						s := followSpan(start.Context(), "ydb_table_session_query_stream_read_intermediate")
+						if info.Error != nil {
+							logError(s, info.Error)
+						}
+						s.Finish()
 						return func(info trace.TableSessionQueryStreamReadDoneInfo) {
-							finish(start, info.Error)
+							s := followSpan(start.Context(), "ydb_table_session_query_stream_read_done")
+							if info.Error != nil {
+								logError(s, info.Error)
+							}
+							s.Finish()
 						}
 					}
 				}

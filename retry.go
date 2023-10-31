@@ -2,7 +2,6 @@ package tracing
 
 import (
 	"fmt"
-
 	"github.com/opentracing/opentracing-go/ext"
 	otlog "github.com/opentracing/opentracing-go/log"
 	"github.com/ydb-platform/ydb-go-sdk-opentracing/internal/str"
@@ -21,13 +20,21 @@ func Retry(details trace.Details) (t trace.Retry) {
 				start.LogFields(otlog.Error(fmt.Errorf("nested call")))
 			}
 			start.SetBaggageItem("idempotent", str.Bool(info.Idempotent))
+			start.Finish()
 			return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-				intermediate(start, info.Error)
+				s := followSpan(start.Context(), "ydb_retry_intermediate")
+				if info.Error != nil {
+					logError(s, info.Error)
+				}
+				s.Finish()
 				return func(info trace.RetryLoopDoneInfo) {
-					finish(start,
-						info.Error,
+					s := followSpan(start.Context(), "ydb_retry_done",
 						otlog.Int("attempts", info.Attempts),
 					)
+					if info.Error != nil {
+						logError(s, info.Error)
+					}
+					s.Finish()
 				}
 			}
 		}
