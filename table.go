@@ -164,7 +164,6 @@ func Table(details trace.Details) (t trace.Table) {
 						info.Context,
 						"ydb_table_session_query_execute",
 						otlog.String("query", safe.Stringer(info.Query)),
-						otlog.String("params", safe.Stringer(info.Parameters)),
 						otlog.Bool("keep_in_cache", info.KeepInCache),
 					)
 					start.SetTag("nodeID", nodeID(safe.ID(info.Session)))
@@ -198,7 +197,6 @@ func Table(details trace.Details) (t trace.Table) {
 						info.Context,
 						"ydb_table_session_query_stream_execute",
 						otlog.String("query", safe.Stringer(info.Query)),
-						otlog.String("params", safe.Stringer(info.Parameters)),
 					)
 					start.SetTag("nodeID", nodeID(safe.ID(info.Session)))
 					start.SetTag("session_id", safe.ID(info.Session))
@@ -302,7 +300,6 @@ func Table(details trace.Details) (t trace.Table) {
 					info.Context,
 					"ydb_table_session_tx_execute",
 					otlog.String("query", safe.Stringer(info.Query)),
-					otlog.String("params", safe.Stringer(info.Parameters)),
 				)
 				start.SetTag("nodeID", nodeID(safe.ID(info.Session)))
 				start.SetTag("session_id", safe.ID(info.Session))
@@ -315,7 +312,6 @@ func Table(details trace.Details) (t trace.Table) {
 				start := startSpan(
 					info.Context,
 					"ydb_table_session_tx_execute_statement",
-					otlog.String("params", safe.Stringer(info.Parameters)),
 				)
 				start.SetTag("nodeID", nodeID(safe.ID(info.Session)))
 				start.SetTag("session_id", safe.ID(info.Session))
