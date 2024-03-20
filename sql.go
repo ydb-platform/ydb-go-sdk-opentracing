@@ -146,7 +146,6 @@ func DatabaseSQL(details trace.Details) (t trace.DatabaseSQL) {
 				otlog.String("query", info.Query),
 			)
 			start.SetTag("transaction_id", safe.ID(info.Tx))
-			start.SetBaggageItem("idempotent", str.Bool(info.Idempotent))
 			return func(info trace.DatabaseSQLTxExecDoneInfo) {
 				finish(
 					start,
@@ -161,7 +160,6 @@ func DatabaseSQL(details trace.Details) (t trace.DatabaseSQL) {
 				otlog.String("query", info.Query),
 			)
 			start.SetTag("transaction_id", safe.ID(info.Tx))
-			start.SetBaggageItem("idempotent", str.Bool(info.Idempotent))
 			return func(info trace.DatabaseSQLTxQueryDoneInfo) {
 				finish(
 					start,

@@ -57,7 +57,7 @@ func Driver(details trace.Details) (t trace.Driver) {
 				)
 			}
 		}
-		t.OnConnNewStream = func(info trace.DriverConnNewStreamStartInfo) func(trace.DriverConnNewStreamRecvInfo) func(trace.DriverConnNewStreamDoneInfo) {
+		t.OnConnNewStream = func(info trace.DriverConnNewStreamStartInfo) func(trace.DriverConnNewStreamDoneInfo) {
 			start := startSpan(
 				info.Context,
 				"ydb_conn_new_stream",
@@ -65,21 +65,14 @@ func Driver(details trace.Details) (t trace.Driver) {
 			start.SetTag("address", safe.Address(info.Endpoint))
 			start.SetTag("method", string(info.Method))
 			start.Finish()
-			return func(info trace.DriverConnNewStreamRecvInfo) func(trace.DriverConnNewStreamDoneInfo) {
-				s := followSpan(start.Context(), "ydb_conn_stream_recv")
+			return func(info trace.DriverConnNewStreamDoneInfo) {
+				s := followSpan(start.Context(), "ydb_conn_stream_end",
+					otlog.String("state", safe.Stringer(info.State)),
+				)
 				if info.Error != nil {
 					logError(s, info.Error)
 				}
 				s.Finish()
-				return func(info trace.DriverConnNewStreamDoneInfo) {
-					s := followSpan(start.Context(), "ydb_conn_stream_end",
-						otlog.String("state", safe.Stringer(info.State)),
-					)
-					if info.Error != nil {
-						logError(s, info.Error)
-					}
-					s.Finish()
-				}
 			}
 		}
 		t.OnConnPark = func(info trace.DriverConnParkStartInfo) func(trace.DriverConnParkDoneInfo) {
