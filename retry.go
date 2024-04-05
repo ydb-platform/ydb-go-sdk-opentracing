@@ -10,7 +10,7 @@ import (
 
 func Retry(details trace.Details) (t trace.Retry) {
 	if details&trace.RetryEvents != 0 {
-		t.OnRetry = func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+		t.OnRetry = func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
 			start := startSpan(
 				info.Context,
 				"ydb_retry",
@@ -21,21 +21,14 @@ func Retry(details trace.Details) (t trace.Retry) {
 			}
 			start.SetBaggageItem("idempotent", str.Bool(info.Idempotent))
 			start.Finish()
-			return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-				s := followSpan(start.Context(), "ydb_retry_intermediate")
+			return func(info trace.RetryLoopDoneInfo) {
+				s := followSpan(start.Context(), "ydb_retry_done",
+					otlog.Int("attempts", info.Attempts),
+				)
 				if info.Error != nil {
 					logError(s, info.Error)
 				}
 				s.Finish()
-				return func(info trace.RetryLoopDoneInfo) {
-					s := followSpan(start.Context(), "ydb_retry_done",
-						otlog.Int("attempts", info.Attempts),
-					)
-					if info.Error != nil {
-						logError(s, info.Error)
-					}
-					s.Finish()
-				}
 			}
 		}
 	}
