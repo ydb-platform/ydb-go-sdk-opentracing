@@ -329,21 +329,6 @@ func Table(details trace.Details) (t trace.Table) {
 					start.SetTag("session_id", safe.ID(info.Session))
 				}
 			}
-			t.OnPoolWait = func(info trace.TablePoolWaitStartInfo) func(trace.TablePoolWaitDoneInfo) {
-				start := startSpan(
-					info.Context,
-					"ydb_table_pool_wait",
-				)
-				return func(info trace.TablePoolWaitDoneInfo) {
-					finish(
-						start,
-						info.Error,
-						otlog.String("status", safe.Status(info.Session)),
-					)
-					start.SetTag("nodeID", nodeID(safe.ID(info.Session)))
-					start.SetTag("session_id", safe.ID(info.Session))
-				}
-			}
 		}
 	}
 	return t
