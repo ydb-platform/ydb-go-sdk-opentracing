@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
-	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"path"
@@ -15,7 +15,6 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	jaegerConfig "github.com/uber/jaeger-client-go/config"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -27,42 +26,27 @@ import (
 	tracing "github.com/ydb-platform/ydb-go-sdk-opentracing"
 )
 
-func init() {
-	http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 500
-}
-
-type quet struct {
-}
-
-func (q quet) Write(p []byte) (n int, err error) {
-	return len(p), nil
-}
-
-const (
-	tracerURL   = "localhost:5775"
-	serviceName = "ydb-go-sdk"
-)
-
-func main() {
-	tracer, closer, err := jaegerConfig.Configuration{
-		ServiceName: serviceName,
+func initJaeger(service string) (opentracing.Tracer, io.Closer) {
+	cfg := &jaegerConfig.Configuration{
+		ServiceName: service,
 		Sampler: &jaegerConfig.SamplerConfig{
 			Type:  "const",
 			Param: 1,
 		},
 		Reporter: &jaegerConfig.ReporterConfig{
-			LogSpans:            true,
-			BufferFlushInterval: 1 * time.Second,
-			LocalAgentHostPort:  tracerURL,
+			LogSpans: true,
 		},
-	}.NewTracer()
-	if err != nil {
-		panic(err)
 	}
+	tracer, closer, err := cfg.NewTracer()
+	if err != nil {
+		panic(fmt.Sprintf("ERROR: cannot init Jaeger: %v\n", err))
+	}
+	return tracer, closer
+}
 
+func main() {
+	tracer, closer := initJaeger("test")
 	defer closer.Close()
-
-	// set global tracer of this application
 	opentracing.SetGlobalTracer(tracer)
 
 	span, ctx := opentracing.StartSpanFromContext(context.Background(), "client")
@@ -83,7 +67,10 @@ func main() {
 		creds,
 		ydb.WithSessionPoolSizeLimit(300),
 		ydb.WithSessionPoolIdleThreshold(time.Second*5),
-		tracing.WithTraces(trace.DetailsAll),
+		tracing.WithTraces(
+			tracing.WithTracer(tracer),
+			tracing.WithDetailer(trace.DetailsAll),
+		),
 	)
 	if err != nil {
 		panic(err)
@@ -92,14 +79,10 @@ func main() {
 		_ = db.Close(ctx)
 	}()
 
-	log.SetOutput(&quet{})
-
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 
-	if concurrency, err := strconv.Atoi(os.Getenv("YDB_PREPARE_BENCH_DATA")); err == nil && concurrency > 0 {
-		_ = upsertData(ctx, db.Table(), db.Name(), "series", concurrency)
-	}
+	_ = upsertData(ctx, db.Table(), db.Name(), "series", 100)
 
 	concurrency := func() int {
 		if concurrency, err := strconv.Atoi(os.Getenv("CONCURRENCY")); err != nil && concurrency > 0 {

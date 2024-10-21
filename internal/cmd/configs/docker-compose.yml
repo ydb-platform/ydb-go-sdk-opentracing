@@ -1,0 +1,33 @@
+version: '3'
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:1.35
+    ports:
+      - "5775:5775/udp"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686"
+      - "14250:14250"
+      - "14268:14268"
+      - "14269:14269"
+      - "9411:9411"
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+  ydb:
+    image: ydbplatform/local-ydb:latest
+    hostname: localhost
+    ports:
+      - "2135:2135"
+      - "2136:2136"
+      - "8765:8765"
+      - "5432:5432"
+    environment:
+      - YDB_USE_IN_MEMORY_PDISKS=true
+      - YDB_TABLE_ENABLE_PREPARED_DDL=true
+      - YDB_DEFAULT_LOG_LEVEL=NOTICE
+      - GRPC_TLS_PORT=2135
+      - GRPC_PORT=2136
+      - MON_PORT=8765
+      - YDB_FEATURE_FLAGS=enable_topic_service_tx
+      - YDB_ENABLE_COLUMN_TABLES=true

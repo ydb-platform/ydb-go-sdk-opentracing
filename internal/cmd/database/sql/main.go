@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"log"
 	"net/http"
 	"os"
@@ -13,10 +12,11 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	jaegerConfig "github.com/uber/jaeger-client-go/config"
-
-	ydbTracing "github.com/ydb-platform/ydb-go-sdk-opentracing"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+
+	ydbTracing "github.com/ydb-platform/ydb-go-sdk-opentracing"
 )
 
 const (
@@ -57,7 +57,10 @@ func main() {
 	nativeDriver, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithDiscoveryInterval(5*time.Second),
 		ydb.WithIgnoreTruncated(),
-		ydbTracing.WithTraces(trace.DetailsAll),
+		ydbTracing.WithTraces(
+			ydbTracing.WithDetailer(trace.DetailsAll),
+			ydbTracing.WithTracer(tracer),
+		),
 	)
 	if err != nil {
 		log.Fatalf("connect error: %v", err)
