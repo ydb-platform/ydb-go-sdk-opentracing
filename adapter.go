@@ -21,8 +21,14 @@ func (cfg *adapter) Details() trace.Details {
 }
 
 func (cfg *adapter) SpanFromContext(ctx context.Context) spans.Span {
+	s := opentracing.SpanFromContext(ctx)
+	
+	if s == nil {
+		return noopSpan{}
+	}
+
 	return &span{
-		span: opentracing.SpanFromContext(ctx),
+		span: s,
 	}
 }
 
